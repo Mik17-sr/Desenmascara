@@ -34,7 +34,7 @@ async def analyze(session: AsyncSession, payload: AnalysisInput) -> tuple[Analys
     psicologia, ages, flagged = await asyncio.gather(
         _no_ai() if injection else classify(payload.text),
         enlaces.domain_ages(unofficial),
-        enlaces.safe_browsing(urls),
+        enlaces.reputation(urls),
     )
 
     hits = []

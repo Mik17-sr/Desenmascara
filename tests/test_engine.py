@@ -4,9 +4,10 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
+from app.core.config import settings
 from app.engine import archivista
 from app.engine.analyzer import INJECTION_PATTERN, Psicologia, classify
-from app.engine.enlaces import DomainAge, check_link
+from app.engine.enlaces import DomainAge, check_link, urlhaus
 from app.engine.juez import BancoHit, CampaignHit, Evidencia, judge
 from app.engine.pistas import extract, plural
 from app.schemas.contract import RiskLevel
@@ -65,6 +66,23 @@ def test_links_official_lookalike_and_claimed():
     assert check_link("https://pagos-rapidos.xyz", OFFICIAL, ["BancoAndino"]).imita_a == "BancoAndino"
     assert check_link("https://xn--bancondino-9db.com", OFFICIAL, []).punycode
     assert check_link("https://periodico.com/nota", OFFICIAL, []).imita_a is None
+
+
+def test_urlhaus_flags_listed_links_and_is_off_without_a_key():
+    keys = []
+
+    def answer(request):
+        keys.append(request.headers.get("Auth-Key"))
+        return httpx.Response(200, json={"query_status": "ok" if b"malo.example" in request.content else "no_results"})
+
+    real_client = httpx.AsyncClient
+    urls = ["http://malo.example/factura.apk", "https://bueno.example"]
+    with patch("app.engine.enlaces.httpx.AsyncClient", lambda **kw: real_client(transport=httpx.MockTransport(answer), **kw)):
+        with patch.object(settings, "URLHAUS_AUTH_KEY", "llave"):
+            assert asyncio.run(urlhaus(urls)) == {"http://malo.example/factura.apk"}
+        with patch.object(settings, "URLHAUS_AUTH_KEY", None):
+            assert asyncio.run(urlhaus(urls)) == set()
+    assert keys == ["llave", "llave"]
 
 
 def test_campaign_variants_look_alike():
