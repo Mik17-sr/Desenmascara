@@ -73,8 +73,15 @@ export type Radar = {
   reportes_por_hora: { hora: number; total: number }[];
   campanas: { id: string; nombre: string; reportes: number; ultimo: string }[];
   alerta: { campana: string; reportes_hoy: number; ultima_hora: number } | null;
+  actividad: { id: string; nivel: "low" | "medium" | "high" | "inconclusive"; puntaje: number; tipo: string; canal: string; modalidad: string | null; cuando: string }[];
   llamadas_ultimas: { entidad: string; real: boolean; cuando: string }[];
 };
+
+export type Health = { status: string; version: string; base_de_datos: string; ia: string };
+
+export function health(): Promise<Health> {
+  return fetch(API_URL.replace(/\/api\/v1\/?$/, "") + "/health", { cache: "no-store" }).then((r) => r.json());
+}
 
 export type BancoView = {
   total: number;

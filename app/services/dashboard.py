@@ -53,6 +53,7 @@ async def radar(session: AsyncSession) -> dict:
             alerta = {"campana": c.nombre, "reportes_hoy": c.total_reportes, "ultima_hora": last_hour}
             break
 
+    recientes = list(await session.scalars(select(Verificacion).order_by(Verificacion.creado_at.desc()).limit(8)))
     consultas = list(await session.scalars(
         select(Verificacion).where(Verificacion.tipo == "llamada").order_by(Verificacion.creado_at.desc()).limit(6)
     ))
@@ -73,6 +74,12 @@ async def radar(session: AsyncSession) -> dict:
         "reportes_por_hora": [{"hora": h, "total": n} for h, n in enumerate(por_hora)],
         "campanas": [{"id": str(c.id), "nombre": c.nombre, "reportes": c.total_reportes, "ultimo": _iso(c.ultimo_reporte_at)} for c in campanas],
         "alerta": alerta,
+        # Anonymous activity feed: level, score, modality, channel and time; never the text or the person.
+        "actividad": [
+            {"id": str(v.id)[:8], "nivel": v.nivel, "puntaje": v.puntaje, "tipo": v.tipo, "canal": v.canal,
+             "modalidad": MODALIDADES.get(v.modalidad or "", (None,))[0], "cuando": _iso(v.creado_at)}
+            for v in recientes
+        ],
         "llamadas_ultimas": [
             {"entidad": next((s["evidence"] for s in v.senales if s["code"].startswith("LLAMADA_")), ""),
              "real": v.nivel == "low", "cuando": _iso(v.creado_at)}

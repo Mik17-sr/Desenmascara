@@ -7,7 +7,7 @@ Esta versión implementa la guía del proyecto (`docs/`, v7.0) con tres cambios:
 | La guía dice | Aquí | Por qué |
 |---|---|---|
 | WhatsApp con Twilio | **Telegram** | Ya existía el bot; no hace falta sandbox ni cuenta de Twilio. Como un bot de Telegram no puede escribir primero, el Círculo usa enlaces de invitación. |
-| Supabase (PostgreSQL + pgvector) | **SQLite local** con las mismas 12 tablas | Funciona sin cuentas. `DATABASE_URL` acepta PostgreSQL/Supabase. Las huellas de campañas son MinHash en JSON. |
+| Supabase (PostgreSQL + pgvector) | **SQLite local o Supabase**, con las mismas 12 tablas | En local funciona sin cuentas. Con Supabase hay RLS y Realtime (ver «Pasar a Supabase»). Las huellas de campañas son MinHash en JSON en lugar de pgvector. |
 | LLM por API (Claude, GPT o Gemini) | **llama3.2 local con Ollama** | Sin claves ni costo. En CPU tarda 5-7 s por análisis, así que la IA solo clasifica y el juez arma la explicación. |
 
 ## Qué hay
@@ -24,7 +24,7 @@ Esta versión implementa la guía del proyecto (`docs/`, v7.0) con tres cambios:
   | 5 · Archivista | `archivista.py` | Huellas MinHash para reconocer campañas aunque cambien palabras |
   | 6 · Juez | `juez.py` | Puntos y reglas de la sección 12; cada punto tiene una razón (Rayos X) |
 - **API** (`app/api/`): análisis público con límite por IP, endpoints del bot (`BOT_API_SECRET`), de las entidades (llave de acceso), del equipo (`ADMIN_API_KEY`) y vistas anónimas para el Dashboard.
-- **Dashboard** (`dashboard/`, Next.js): Radar en vivo, Verificar un mensaje con Rayos X, Banco de números y Panel de la entidad.
+- **Dashboard** (`dashboard/`, Next.js): Radar en vivo con actividad y avisos, Verificar un mensaje con Rayos X, Banco de números y Panel de la entidad. Con Supabase se actualiza por Realtime; sin Supabase consulta cada 3 s.
 
 ## Cómo arrancarlo (Windows, PowerShell)
 
@@ -60,6 +60,19 @@ npm run start                        # http://localhost:3000
 - La llave del equipo (revisiones y lista blanca) es `ADMIN_API_KEY` de `.env`.
 - Documentación de la API: http://127.0.0.1:8000/docs
 
+## Pasar a Supabase (RLS y Realtime)
+
+1. Crea un proyecto en [supabase.com](https://supabase.com).
+2. En **SQL Editor**, pega y ejecuta `supabase/migrations/20261021120000_esquema_inicial.sql` (o `supabase db push` con la CLI). Crea las 12 tablas con RLS, las 5 vistas anónimas y la tabla `eventos_dashboard`, que ya queda publicada en Realtime.
+3. En **Project Settings → Database → Connection string**, copia la de **Session pooler** (funciona con IPv4) y ponla en `.env`:
+   `DATABASE_URL=postgresql://postgres.<proyecto>:<contraseña>@aws-0-<región>.pooler.supabase.com:5432/postgres`
+4. Copia tus datos locales (opcional): `python scripts/migrar_a_supabase.py`. Usa los mismos `HMAC_SECRET` y `ENCRYPTION_KEY`.
+5. En el Dashboard, copia `dashboard/.env.local.example` a `dashboard/.env.local` con la **Project URL** y la llave pública **anon** (Project Settings → API), y vuelve a ejecutar `npm run build` y `npm run start`. La barra lateral mostrará «Tiempo real · Realtime».
+
+Cómo queda protegido: la API se conecta como `postgres` (dueño de las tablas); `anon` y `authenticated` no pueden leer ninguna tabla con datos, solo las vistas agregadas y `eventos_dashboard`, que guarda qué tabla cambió y el nivel de riesgo, sin texto, números ni usuarios. Nunca pongas la llave `service_role` en el Dashboard.
+
+Para probar la migración sin Supabase: `TEST_DATABASE_URL=postgresql://... python -m pytest` corre las 67 pruebas sobre un PostgreSQL vacío con la migración aplicada.
+
 ## Pruebas y medición
 
 ```powershell
@@ -88,7 +101,7 @@ Con otras aplicaciones abiertas la CPU se satura y algunas respuestas pasan de 8
 | Enlaces y SSRF | Los enlaces nunca se abren: solo se compara el nombre y se consulta RDAP en un host fijo, con tiempo límite. |
 | Rate limiting | 20 consultas por minuto por IP en lo público y 12 por persona en el bot. |
 | Secretos | En `.env` (ignorado por git), generados por `setup_local.py`. Falta gitleaks en CI. |
-| Acceso a datos | El Dashboard solo lee agregados anónimos; entidades con llave (guardada como hash). Falta RLS al pasar a Supabase. |
+| Acceso a datos | RLS en las 13 tablas de Supabase y permisos revocados a `anon`/`authenticated`; el Dashboard solo lee agregados anónimos; entidades con llave (guardada como hash). |
 | Cifrado | Teléfonos, llaves e ids de Telegram como HMAC-SHA256; códigos y chats cifrados (Fernet). Falta TLS al desplegar. |
 | Datos personales | Se borran nombres, números y cuentas antes de guardar; audios en memoria; `/borrar` elimina a la persona. |
 | Envenenamiento | Un voto por persona y valor, reportes viejos a la mitad, revisión por el dueño. |
@@ -101,4 +114,4 @@ Con otras aplicaciones abiertas la CPU se satura y algunas respuestas pasan de 8
 
 Funciona: el bot con mensajes, capturas, números y notas de voz; Llamada Verificada con BancoAndino (ficticio); Círculo de Confianza con invitaciones; Banco de números con lista blanca y revisiones; Antes de pagar; el Dashboard con sus 4 vistas.
 
-Falta o es visión: WhatsApp (Twilio); los 4 casos reales del equipo y el dataset real; despliegue (Render/Railway y Vercel) con TLS; Supabase con RLS y Realtime (el Dashboard hoy consulta cada 3 s); escaneos de seguridad en CI; entidades reales conectadas.
+Falta o es visión: WhatsApp (Twilio); los 4 casos reales del equipo y el dataset real; despliegue (Render/Railway y Vercel) con TLS; escaneos de seguridad en CI; entidades reales conectadas.
