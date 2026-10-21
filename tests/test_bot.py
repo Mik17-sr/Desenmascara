@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.bot import handlers, textos
+from app.bot import client, handlers, textos
 from app.bot.formatters import format_analysis, format_call, format_code, format_heard, format_number, format_report
 from app.schemas.contract import AnalysisResult, SignalItem, SignalSource
 
@@ -18,6 +18,11 @@ def unescaped_reserved(message: str) -> list[str]:
     while i < len(message):
         if message[i] == "\\":
             i += 2
+            continue
+        if message[i] == "`":  # inline code: its content follows other rules
+            end = message.find("`", i + 1)
+            assert end != -1, message
+            i = end + 1
             continue
         if message[i] in RESERVED:
             found.append(message[i])
@@ -72,6 +77,34 @@ def test_counts_of_one_read_well():
     assert "*1 reporte* de 1 persona\\." in number
     assert "*1 persona* que lo reportó\\." in format_report({"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 1})
     assert "*3 personas* que lo reportaron\\." in format_report({"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 3})
+
+
+def test_verified_call_code_is_in_a_box():
+    assert "`4 8 2 1`" in format_call({"estado": "real", "entidad": "BancoAndino", "motivo": "Confirmar una compra.", "codigo": "4821"})
+
+
+def fake_bot(name, short, description, photos):
+    return SimpleNamespace(
+        id=1, get_my_name=AsyncMock(return_value=SimpleNamespace(name=name)),
+        get_my_short_description=AsyncMock(return_value=SimpleNamespace(short_description=short)),
+        get_my_description=AsyncMock(return_value=SimpleNamespace(description=description)),
+        get_user_profile_photos=AsyncMock(return_value=SimpleNamespace(total_count=photos)),
+        set_my_name=AsyncMock(), set_my_short_description=AsyncMock(), set_my_description=AsyncMock(), set_my_profile_photo=AsyncMock(),
+    )
+
+
+def test_profile_sends_only_what_changed():
+    assert len(client.NOMBRE) <= 64 and len(client.DESCRIPCION_CORTA) <= 120 and len(client.DESCRIPCION) <= 512  # Telegram's limits
+    bot = fake_bot(client.NOMBRE, "vieja", client.DESCRIPCION, photos=1)
+    asyncio.run(client._profile(bot))
+    bot.set_my_short_description.assert_awaited_once_with(client.DESCRIPCION_CORTA)
+    for setter in (bot.set_my_name, bot.set_my_description, bot.set_my_profile_photo):
+        setter.assert_not_awaited()
+
+    new = fake_bot("Desenmascara Demo", client.DESCRIPCION_CORTA, client.DESCRIPCION, photos=0)
+    asyncio.run(client._profile(new))
+    new.set_my_name.assert_awaited_once_with(client.NOMBRE)
+    new.set_my_profile_photo.assert_awaited_once()
 
 
 # --- Handlers with fake Telegram and API objects ------------------------------------------------
