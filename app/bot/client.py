@@ -79,13 +79,13 @@ def format_analysis(result: AnalysisResult) -> str:
     if result.recommendations:
         lines.extend(f"• {_escape(item)}" for item in result.recommendations)
     else:
-        lines.append("• Verifica por otro canal antes de compartir datos o realizar pagos.")
+        lines.append("• " + _escape("Verifica por otro canal antes de compartir datos o realizar pagos."))
 
     lines.extend(["", "*Limitaciones*"])
     if result.limitations:
         lines.extend(f"• {_escape(item)}" for item in result.limitations)
     else:
-        lines.append("• El análisis automático puede equivocarse; revisa el contexto por tu cuenta.")
+        lines.append("• " + _escape("El análisis automático puede equivocarse; revisa el contexto por tu cuenta."))
 
     # Telegram limits messages to 4096 characters. Leave room for the truncation notice.
     message = "\n".join(lines)
