@@ -75,7 +75,7 @@ export default function RadarPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           <Kpi label="Verificaciones hoy" value={data?.verificaciones_hoy ?? 0} loading={!data}
                delta={change} note={change === null ? "sin datos de ayer" : "vs. ayer"} />
           <Kpi label="Alto riesgo" value={data?.alto_riesgo_pct ?? 0} suffix=" %" tone="high" loading={!data}
@@ -103,7 +103,7 @@ export default function RadarPage() {
 
           <Card title="Reportes por hora" icon={Activity}
                 action={peak && peak.total > 0 && <span className="text-xs text-muted">pico: {peak.hora}:00</span>}>
-            <div className="h-full min-h-52">
+            <div className="h-60">
               {data ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data.reportes_por_hora} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>

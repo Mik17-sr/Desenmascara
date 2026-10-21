@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import select  # noqa: E402
 
+from app.core.config import settings  # noqa: E402
 from app.core.security import encrypt, hash_api_key, new_api_key  # noqa: E402
 from app.db.database import SessionLocal, init_db  # noqa: E402
 from app.db.models import Usuario  # noqa: E402
@@ -35,6 +36,11 @@ REPORTADOS = [
 ]
 
 
+def panel_link(key: str) -> str:
+    """Opens the entity panel already signed in. The key goes after '#', so it never reaches a server."""
+    return f"{settings.DASHBOARD_ORIGINS.split(',')[0].strip()}/entidad#llave={key}"
+
+
 async def main(rotate: bool) -> None:
     await init_db()
     async with SessionLocal() as db:
@@ -53,10 +59,12 @@ async def main(rotate: bool) -> None:
             if entidad is None:
                 entidad, key = await entidades.create(db, nombre, tipo, dominio, lineas)
                 print(f"Entidad creada: {nombre} · llave de acceso: {key}")
+                print(f"  Abre el panel sin escribirla: {panel_link(key)}")
             elif rotate and nombre == "BancoAndino":
                 key = new_api_key()
                 entidad.api_key_hash = hash_api_key(key)
                 print(f"Nueva llave de {nombre}: {key}")
+                print(f"  Abre el panel sin escribirla: {panel_link(key)}")
             else:
                 print(f"{nombre} ya existía (su llave no se vuelve a mostrar; usa --nueva-llave).")
             await banco.add_official(db, entidad, "telefono", oficial, "telegram", "registro", nombre)
