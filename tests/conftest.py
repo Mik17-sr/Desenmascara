@@ -6,7 +6,8 @@ from cryptography.fernet import Fernet
 # Before any app import: settings and the database engine are created when app.* is imported.
 _db_dir = tempfile.mkdtemp(prefix="desenmascara-tests-")
 os.environ.update({
-    "DATABASE_URL": f"sqlite+aiosqlite:///{_db_dir}/test.db",
+    # TEST_DATABASE_URL runs the same tests on an empty PostgreSQL with the Supabase migration applied.
+    "DATABASE_URL": os.environ.get("TEST_DATABASE_URL") or f"sqlite+aiosqlite:///{_db_dir}/test.db",
     "HMAC_SECRET": "test-hmac-secret",
     "ENCRYPTION_KEY": Fernet.generate_key().decode(),
     "BOT_API_SECRET": "test-bot-secret",

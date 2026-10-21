@@ -1,6 +1,6 @@
 from collections.abc import AsyncGenerator
 
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -23,7 +23,12 @@ def _async_database_url() -> str:
 
 _database_url = _async_database_url()
 IS_SQLITE = _database_url.startswith("sqlite")
-engine = create_async_engine(_database_url, pool_pre_ping=True)
+if not IS_SQLITE and "prepared_statement_cache_size" not in _database_url:
+    # Supabase's pooler (PgBouncer) does not keep prepared statements between transactions.
+    _database_url += ("&" if "?" in _database_url else "?") + "prepared_statement_cache_size=0"
+engine = create_async_engine(
+    _database_url, pool_pre_ping=True, connect_args={} if IS_SQLITE else {"statement_cache_size": 0},
+)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 if IS_SQLITE:
@@ -36,12 +41,20 @@ if IS_SQLITE:
         cursor.close()
 
 
+MIGRATION = "supabase/migrations/20261021120000_esquema_inicial.sql"
+
+
 async def init_db() -> None:
-    """Create the 12 tables if they do not exist (local SQLite; Supabase uses a migration)."""
+    """SQLite: create the 12 tables. PostgreSQL/Supabase: the migration creates them, with RLS."""
     from app.db.models import Base
 
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        if IS_SQLITE:
+            await conn.run_sync(Base.metadata.create_all)
+            return
+        missing = [t for t in Base.metadata.tables if (await conn.execute(text("select to_regclass(:t)"), {"t": t})).scalar() is None]
+    if missing:
+        raise RuntimeError(f"Faltan tablas en la base de datos ({', '.join(missing)}). Aplica {MIGRATION} en Supabase.")
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
