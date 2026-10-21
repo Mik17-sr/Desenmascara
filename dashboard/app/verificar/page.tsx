@@ -60,7 +60,7 @@ export default function VerificarPage() {
     <div>
       <PageHeader title="Verificar un mensaje" subtitle="El mismo cerebro de seis revisiones que usa el bot de Telegram, con los Rayos X del puntaje." />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="space-y-6">
           <Card>
             <div role="tablist" className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1 text-sm">

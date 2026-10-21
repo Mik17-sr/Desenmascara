@@ -21,13 +21,17 @@ export default function BancoPage() {
   const [found, setFound] = useState<Lookup | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  // The team key stays in this browser until it is erased from the field.
   useEffect(() => {
-    try { setTeamKey(sessionStorage.getItem(TEAM_KEY) ?? ""); } catch { /* storage blocked: the key is asked again */ }
+    try { setTeamKey(localStorage.getItem(TEAM_KEY) ?? ""); } catch { /* storage blocked: the key is asked again */ }
   }, []);
 
   function saveKey(value: string) {
     setTeamKey(value);
-    try { sessionStorage.setItem(TEAM_KEY, value); } catch { /* storage blocked */ }
+    try {
+      if (value) localStorage.setItem(TEAM_KEY, value);
+      else localStorage.removeItem(TEAM_KEY);
+    } catch { /* storage blocked */ }
   }
 
   async function lookup() {
@@ -87,52 +91,66 @@ export default function BancoPage() {
           </Card>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi label="Números, llaves y cuentas" value={data?.total ?? 0} loading={!data} note="en el Banco" />
           <Kpi label="En alto riesgo" value={data?.alto_riesgo ?? 0} tone="high" loading={!data} note="nivel 70 o más" />
           <Kpi label="Reportes esta semana" value={data?.reportes_semana ?? 0} loading={!data} note={data ? `de ${plural(data.personas_semana, "persona", "personas distintas")}` : undefined} />
           <Kpi label="Números oficiales" value={data?.oficiales ?? 0} tone="brand" loading={!data} note="lista blanca verificada" />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-3">
-          <div className="space-y-6 xl:col-span-2">
-            <Card title="Más reportados" icon={Users} padded={false} action={<span className="text-xs text-muted">ordenados por nivel de riesgo</span>}>
-              {!data ? <div className="space-y-2 p-5">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10" />)}</div> : data.mas_reportados.length ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-160 text-sm">
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="min-w-0 space-y-4 lg:col-span-2">
+            <Card title="Más reportados" icon={Users} padded={false} action={<span className="hidden text-xs text-muted sm:inline">ordenados por nivel de riesgo</span>}>
+              {!data ? <div className="space-y-2 p-5">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10" />)}</div> : data.mas_reportados.length ? (<>
+                <ul className="divide-y divide-line md:hidden">
+                  {data.mas_reportados.map((r) => (
+                    <li key={r.valor + r.tipo} className="px-5 py-3 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="tabular font-semibold">{r.valor}</span>
+                        <RiskCell row={r} />
+                      </div>
+                      <div className="mt-1 text-xs text-muted">{TIPOS[r.tipo] ?? r.tipo} · {plural(r.personas, "persona", "personas")} · {ago(r.ultimo)}</div>
+                      {r.modalidad && <div className="mt-0.5 text-xs">{r.modalidad}</div>}
+                    </li>
+                  ))}
+                </ul>
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full text-sm">
                     <thead className="bg-surface-2 text-left text-[11px] uppercase tracking-wide text-muted">
                       <tr>
-                        <th className="whitespace-nowrap py-3 pl-5 pr-3 font-semibold">Número, llave o cuenta</th>
-                        <th className="whitespace-nowrap px-3 font-semibold">Tipo</th>
-                        <th className="whitespace-nowrap px-3 text-right font-semibold">Personas</th>
-                        <th className="whitespace-nowrap px-3 font-semibold">Nivel de riesgo</th>
-                        <th className="min-w-44 px-3 font-semibold">Modalidad</th>
-                        <th className="whitespace-nowrap pl-3 pr-5 font-semibold">Último</th>
+                        <th className="py-3 pl-5 pr-2.5 font-semibold xl:whitespace-nowrap">Número, llave o cuenta</th>
+                        <th className="hidden whitespace-nowrap px-3 font-semibold xl:table-cell">Tipo</th>
+                        <th className="whitespace-nowrap px-2.5 text-right font-semibold">Personas</th>
+                        <th className="whitespace-nowrap px-2.5 font-semibold">Nivel de riesgo</th>
+                        <th className="px-2.5 font-semibold">Modalidad</th>
+                        <th className="whitespace-nowrap pl-2.5 pr-4 font-semibold">Último</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
                       {data.mas_reportados.map((r) => (
                         <tr key={r.valor + r.tipo} className="transition hover:bg-surface-2">
-                          <td className="tabular whitespace-nowrap py-3 pl-5 pr-3 font-semibold">{r.valor}</td>
-                          <td className="whitespace-nowrap px-3 text-muted">{TIPOS[r.tipo] ?? r.tipo}</td>
-                          <td className="tabular px-3 text-right">{n(r.personas)}</td>
-                          <td className="px-3">{r.palabra === "En revisión"
-                            ? <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-semibold text-muted">En revisión</span>
-                            : <LevelPill level={levelOf(r.nivel)} score={r.nivel} word={r.palabra} />}</td>
-                          <td className="min-w-44 px-3 py-3 leading-snug">{r.modalidad ?? "—"}</td>
-                          <td className="whitespace-nowrap pl-3 pr-5 text-muted">{ago(r.ultimo)}</td>
+                          <td className="tabular whitespace-nowrap py-3 pl-5 pr-2.5 font-semibold">
+                            {r.valor}
+                            <div className="text-xs font-normal text-muted xl:hidden">{TIPOS[r.tipo] ?? r.tipo}</div>
+                          </td>
+                          <td className="hidden px-3 leading-snug text-muted xl:table-cell">{TIPOS[r.tipo] ?? r.tipo}</td>
+                          <td className="tabular px-2.5 text-right">{n(r.personas)}</td>
+                          <td className="px-2.5"><RiskCell row={r} /></td>
+                          <td className="min-w-28 px-2.5 py-3 leading-snug">{r.modalidad ?? "—"}</td>
+                          <td className="whitespace-nowrap pl-2.5 pr-4 text-muted">{ago(r.ultimo)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              ) : <Empty icon={Database}>Todavía no hay reportes.</Empty>}
+              </>) : <Empty icon={Database}>Todavía no hay reportes.</Empty>}
               <p className="border-t border-line px-5 py-3 text-xs text-muted">
                 Nunca dice «estafador»: muestra cuántas personas distintas lo reportaron y cuándo. Cada persona cuenta una sola vez.
               </p>
             </Card>
 
-            <Card title="Reportes por día" icon={Activity} action={<span className="text-xs text-muted">últimos 7 días</span>}>
+            <Card title="Reportes por día" icon={Activity}
+                  action={<span className="text-xs text-muted">últimos 7 días{days.length ? ` · ${n(days.reduce((sum, d) => sum + d.total, 0))} en total` : ""}</span>}>
               <div className="h-56">
                 {data ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -152,15 +170,7 @@ export default function BancoPage() {
             </Card>
           </div>
 
-          <div className="space-y-6">
-            <Card title="Llave del equipo" icon={Key}>
-              <label className="block text-xs text-muted">
-                Para aceptar revisiones y agregar números oficiales (ADMIN_API_KEY del archivo .env).
-                <input type="password" value={teamKey} onChange={(e) => saveKey(e.target.value)} autoComplete="off" placeholder="adm_…"
-                       className="mt-2 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-4 focus:ring-brand/15" />
-              </label>
-            </Card>
-
+          <div className="min-w-0 space-y-4">
             <Card title="Solicitudes de revisión" icon={AlertTriangle} action={data && <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold">{data.solicitudes.length}</span>}>
               {!data ? <Skeleton className="h-20" /> : data.solicitudes.length ? (
                 <ul className="space-y-3">
@@ -194,12 +204,26 @@ export default function BancoPage() {
               </ul>
               <AddOfficial teamKey={teamKey} onDone={(m) => { setMessage(m); refresh(); }} />
             </Card>
+
+            <Card title="Llave del equipo" icon={Key}>
+              <label className="block text-xs text-muted">
+                Para aceptar revisiones y agregar números oficiales (ADMIN_API_KEY del archivo .env). Queda guardada en este equipo; bórrala del campo para olvidarla.
+                <input type="password" value={teamKey} onChange={(e) => saveKey(e.target.value)} autoComplete="off" placeholder="adm_…"
+                       className="mt-2 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-4 focus:ring-brand/15" />
+              </label>
+            </Card>
           </div>
         </div>
         <p className="text-right text-xs text-muted">Datos de prueba ficticios marcados como «Demo» · números enmascarados</p>
       </div>
     </div>
   );
+}
+
+function RiskCell({ row }: { row: BancoView["mas_reportados"][number] }) {
+  return row.palabra === "En revisión"
+    ? <span className="whitespace-nowrap rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-semibold text-muted">En revisión</span>
+    : <LevelPill level={levelOf(row.nivel)} score={row.nivel} word={row.palabra} />;
 }
 
 function AddOfficial({ teamKey, onDone }: { teamKey: string; onDone: (message: string) => void }) {

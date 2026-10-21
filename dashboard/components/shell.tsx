@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
-import { Building } from "@/components/icons";
+import { Building, Moon, Sun } from "@/components/icons";
 import { LiveDot, Logo } from "@/components/ui";
 import { health, type Health } from "@/lib/api";
 import { supabase, useRealtimeStatus } from "@/lib/supabase";
@@ -34,18 +34,19 @@ export function Shell({ children }: { children: ReactNode }) {
               <span className="hidden text-[10.5px] text-muted sm:block">bot antiestafas · plataforma</span>
             </span>
           </Link>
-          <nav className="hidden h-full items-stretch gap-1 md:flex" aria-label="Vistas">
+          <nav className="hidden h-full items-stretch gap-1 lg:flex" aria-label="Vistas">
             {TABS.map((tab) => <Tab key={tab.href} {...tab} active={isActive(path, tab.href)} />)}
           </nav>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <LiveMode />
+            <ThemeToggle />
             <Link href={ENTIDAD.href} aria-current={isActive(path, ENTIDAD.href) ? "page" : undefined}
-                  className={`hidden items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition md:inline-flex ${isActive(path, ENTIDAD.href) ? "bg-brand-soft text-brand-ink" : "text-muted hover:bg-surface-2 hover:text-ink"}`}>
+                  className={`hidden items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition lg:inline-flex ${isActive(path, ENTIDAD.href) ? "bg-brand-soft text-brand-ink" : "text-muted hover:bg-surface-2 hover:text-ink"}`}>
               <Building width={16} height={16} /> {ENTIDAD.label}
             </Link>
           </div>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-2 md:hidden" aria-label="Vistas">
+        <nav className="flex gap-1 overflow-x-auto px-2 sm:px-4 lg:hidden" aria-label="Vistas">
           {[...TABS, ENTIDAD].map((tab) => <Tab key={tab.href} {...tab} label={tab.short} active={isActive(path, tab.href)} />)}
         </nav>
       </header>
@@ -59,10 +60,30 @@ export function Shell({ children }: { children: ReactNode }) {
 function Tab({ href, label, active }: { href: string; label: string; active: boolean }) {
   return (
     <Link href={href} aria-current={active ? "page" : undefined}
-          className={`relative flex shrink-0 items-center whitespace-nowrap px-2.5 py-3 text-sm font-medium transition md:px-3 md:py-0 ${active ? "text-brand-ink" : "text-muted hover:text-ink"}`}>
+          className={`relative flex shrink-0 items-center whitespace-nowrap px-2.5 py-3 text-sm font-medium transition lg:px-3 lg:py-0 ${active ? "text-brand-ink" : "text-muted hover:text-ink"}`}>
       {label}
       <span className={`absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-brand transition-opacity ${active ? "opacity-100" : "opacity-0"}`} />
     </Link>
+  );
+}
+
+const THEME_KEY = "desenmascara.tema"; // read before the first paint in app/layout.tsx
+
+function ThemeToggle() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => setDark(document.documentElement.dataset.theme === "dark"), []);
+  function toggle() {
+    const next = dark ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    setDark(!dark);
+    try { localStorage.setItem(THEME_KEY, next); } catch { /* storage blocked: back to light next visit */ }
+  }
+  const label = dark ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
+  return (
+    <button type="button" onClick={toggle} aria-label={label} title={label}
+            className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-ink">
+      {dark ? <Sun width={17} height={17} /> : <Moon width={17} height={17} />}
+    </button>
   );
 }
 

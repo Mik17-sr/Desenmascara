@@ -12,13 +12,17 @@ export const metadata: Metadata = {
   description: "Radar de campañas de estafa, verificación de mensajes, Banco de números y Panel de la entidad.",
 };
 
-export const viewport: Viewport = {
-  themeColor: [{ media: "(prefers-color-scheme: light)", color: "#ffffff" }, { media: "(prefers-color-scheme: dark)", color: "#0b100f" }],
-};
+export const viewport: Viewport = { themeColor: "#ffffff" };
+
+// Light like the guide unless the viewer chose dark (shell.tsx); set before the first paint so it does not flash.
+const THEME_SCRIPT = `try{if(localStorage.getItem("desenmascara.tema")==="dark")document.documentElement.dataset.theme="dark"}catch(e){}`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="es">
+    <html lang="es" data-theme="light" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className={`${inter.variable} ${jetbrains.variable} antialiased`}>
         <Shell>{children}</Shell>
       </body>

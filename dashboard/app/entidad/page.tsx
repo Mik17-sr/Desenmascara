@@ -18,30 +18,52 @@ const ESTADOS: Record<string, { label: string; className: string }> = {
 
 type Registro = { codigo_verificacion: string; vence_at: string };
 
+// "Recordar en este equipo" keeps the key in localStorage until "Cerrar sesión"; otherwise it lasts
+// only while the tab is open. Storage can be blocked: then the key is simply asked again.
+function savedKey(): string {
+  try { return localStorage.getItem(KEY) ?? sessionStorage.getItem(KEY) ?? ""; } catch { return ""; }
+}
+function forgetKey() {
+  try { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); } catch { /* storage blocked */ }
+}
+function keepKey(value: string, remember: boolean) {
+  forgetKey();
+  try { (remember ? localStorage : sessionStorage).setItem(KEY, value); } catch { /* storage blocked */ }
+}
+
 export default function EntidadPage() {
   const [key, setKey] = useState("");
+  const [remember, setRemember] = useState(true);
   const [entity, setEntity] = useState<{ nombre: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(true);
 
-  const login = useCallback(async (candidate: string) => {
+  const login = useCallback(async (candidate: string, keep: boolean) => {
     setError(null);
     try {
       const me = await api<{ nombre: string }>("/entidad/yo", { headers: { "X-Entity-API-Key": candidate } });
       setEntity(me);
       setKey(candidate);
-      try { sessionStorage.setItem(KEY, candidate); } catch { /* storage blocked */ }
+      keepKey(candidate, keep);
     } catch (e) {
       setEntity(null);
+      if (e instanceof ApiError && e.status === 401) forgetKey();
       setError(e instanceof ApiError && e.status === 401 ? "Esa llave de acceso no es válida." : e instanceof Error ? e.message : "Error");
     }
   }, []);
 
   useEffect(() => {
-    let saved = "";
-    try { saved = sessionStorage.getItem(KEY) ?? ""; } catch { /* storage blocked */ }
-    if (saved) login(saved);
+    // seed_demo.py prints /entidad#llave=…: sign in from the link and take the key out of the address bar.
+    const fromLink = new URLSearchParams(window.location.hash.slice(1)).get("llave");
+    if (fromLink) history.replaceState(null, "", window.location.pathname);
+    let remembered = !!fromLink;
+    if (!fromLink) try { remembered = localStorage.getItem(KEY) !== null; } catch { /* storage blocked */ }
+    const candidate = fromLink ?? savedKey();
+    if (candidate) login(candidate, remembered).finally(() => setChecking(false));
+    else setChecking(false);
   }, [login]);
 
+  if (checking) return <div className="mx-auto max-w-md py-24"><div className="skeleton h-40" /></div>;
   if (!entity) {
     return (
       <div className="mx-auto grid max-w-5xl items-center gap-10 py-6 lg:grid-cols-2 lg:py-12">
@@ -56,7 +78,7 @@ export default function EntidadPage() {
           </ul>
         </div>
         <Card className="rise">
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); login(key); }}>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); login(key, remember); }}>
             <div className="flex items-center gap-3">
               <span className="grid h-11 w-11 place-items-center rounded-2xl bg-brand-soft text-brand-ink"><Building /></span>
               <div><div className="font-semibold">Acceso para entidades</div><div className="text-xs text-muted">Bancos, operadores y tiendas</div></div>
@@ -69,15 +91,19 @@ export default function EntidadPage() {
                        className="w-full rounded-xl border border-line bg-surface py-2.5 pl-9 pr-3 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand/15" />
               </div>
             </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-brand" />
+              Recordar la llave en este equipo
+            </label>
             <Button disabled={!key} className="w-full py-2.5">Entrar al panel</Button>
             {error && <Notice>{error}</Notice>}
-            <p className="text-xs text-muted">Para la demo, `python scripts/seed_demo.py --nueva-llave` muestra la llave de BancoAndino (entidad ficticia).</p>
+            <p className="text-xs text-muted">Para la demo, `python scripts/seed_demo.py --nueva-llave` muestra la llave de BancoAndino (entidad ficticia) y un enlace que entra sin escribirla.</p>
           </form>
         </Card>
       </div>
     );
   }
-  return <Panel entity={entity.nombre} apiKey={key} onLogout={() => { setEntity(null); setKey(""); try { sessionStorage.removeItem(KEY); } catch { /* */ } }} />;
+  return <Panel entity={entity.nombre} apiKey={key} onLogout={() => { setEntity(null); setKey(""); forgetKey(); }} />;
 }
 
 function Panel({ entity, apiKey, onLogout }: { entity: string; apiKey: string; onLogout: () => void }) {

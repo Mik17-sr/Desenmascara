@@ -23,10 +23,10 @@ export function Logo({ size = 30 }: { size?: number }) {
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0">
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+        {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -37,7 +37,7 @@ export function Card({ title, icon: Icon, action, children, className = "", padd
   title?: string; icon?: IconType; action?: ReactNode; children: ReactNode; className?: string; padded?: boolean;
 }) {
   return (
-    <section className={`rise flex flex-col rounded-2xl border border-line bg-surface shadow-card ${className}`}>
+    <section className={`rise flex min-w-0 flex-col rounded-2xl border border-line bg-surface shadow-card ${className}`}>
       {title && (
         <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
@@ -71,9 +71,9 @@ export function Kpi({ label, value, suffix = "", decimals = 0, note, delta, tone
 }) {
   const shown = useCountUp(value);
   const color = tone === "high" ? "text-risk-high" : tone === "brand" ? "text-brand-ink" : "";
-  const tile = tone === "brand" ? "border-brand/30 bg-brand-soft" : "border-line bg-surface";
+  const tile = tone === "brand" ? "border-brand/30 bg-brand-soft" : "border-line bg-surface-2";
   return (
-    <div className={`rise flex flex-col rounded-xl border p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-lg ${tile}`}>
+    <div className={`rise flex min-w-0 flex-col rounded-xl border p-4 transition hover:-translate-y-0.5 hover:shadow-card ${tile}`}>
       <span className="text-xs font-medium text-muted">{label}</span>
       {loading ? <div className="skeleton mt-2 h-8 w-20" /> : (
         <div className={`tabular mt-1 text-2xl font-bold tracking-tight sm:text-[28px] ${color}`}>
