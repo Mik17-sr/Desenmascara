@@ -1,6 +1,6 @@
 # Agente 4 — Base de Datos, Persistencia y Tiempo Real
 
-**Responsable:** Luis Guillermo Nieto Patiño & Miguel  
+**Responsables:** Luis Guillermo Nieto Patiño & Miguel  
 **Motor:** PostgreSQL 15 en Supabase · Extensión `pgvector` · Supabase Realtime · Row Level Security (RLS)  
 **Misión:** Administrar el modelo de datos relacional y vectorial de 12 tablas, asegurar el aislamiento de datos por RLS, gestionar la búsqueda semántica de campañas y emitir eventos en vivo para el Dashboard.
 
@@ -16,7 +16,7 @@
 
 [DOMINIO 2: VERIFICACIONES Y CAMPAÑAS]
   usuarios ──────< verificaciones >────── campanas (pgvector)
-                          │
+
 [DOMINIO 3: BANCO DE NÚMEROS]
   usuarios ──────< reportes >────── indicadores ──────< solicitudes_revision
                                          │
@@ -28,7 +28,7 @@
 
 ---
 
-## 2. Esquema DDL SQL Detallado (`migrations/001_initial_schema.sql`)
+## 2. Esquema DDL SQL (`migrations/001_initial_schema.sql`)
 
 ### Grupo 1: Personas y Círculo de Confianza
 ```sql
@@ -37,8 +37,9 @@ CREATE EXTENSION IF NOT EXISTS "vector";
 
 CREATE TABLE usuarios (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    telefono_hash TEXT UNIQUE NOT NULL,      -- HMAC-SHA256(phone, SECRET)
-    telefono_cifrado BYTEA,                  -- AES-256-GCM para escribir al usuario
+    telegram_id BIGINT UNIQUE,               -- ID numérico de Telegram
+    telegram_hash TEXT UNIQUE NOT NULL,      -- HMAC-SHA256(telegram_id, SECRET)
+    telefono_hash TEXT,                      -- HMAC-SHA256(phone, SECRET) si compartió contacto
     nombre_corto TEXT,
     consentimiento_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -55,7 +56,7 @@ CREATE TABLE miembros_circulo (
     circulo_id UUID REFERENCES circulos(id) ON DELETE CASCADE,
     usuario_id UUID REFERENCES usuarios(id) ON DELETE CASCADE,
     rol TEXT NOT NULL,                      -- protegido | familiar_verificador
-    relacion TEXT,                          -- mama, hijo, jefe, etc.
+    relacion TEXT,                          -- mama, hijo, jefe
     acepto_at TIMESTAMPTZ,
     PRIMARY KEY (circulo_id, usuario_id)
 );
@@ -89,7 +90,7 @@ CREATE TABLE verificaciones (
     usuario_id UUID REFERENCES usuarios(id),
     campana_id UUID REFERENCES campanas(id),
     llamada_id UUID,
-    canal TEXT NOT NULL,                    -- whatsapp | sms | llamada | compra
+    canal TEXT NOT NULL DEFAULT 'telegram',  -- telegram | sms | llamada | compra
     tipo TEXT NOT NULL,                     -- mensaje | captura | voz | numero
     texto_anonimizado TEXT NOT NULL,
     puntaje INT NOT NULL CHECK (puntaje BETWEEN 0 AND 100),
@@ -141,9 +142,9 @@ CREATE TABLE solicitudes_revision (
 CREATE TABLE numeros_oficiales (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     entidad_id UUID,
-    nombre TEXT NOT NULL,                   -- "BancoAndino WhatsApp Oficial"
+    nombre TEXT NOT NULL,                   -- "BancoAndino Atención Oficial"
     valor_hash TEXT UNIQUE NOT NULL,
-    canal TEXT NOT NULL,                    -- whatsapp | llamada | sms
+    canal TEXT NOT NULL,                    -- telegram | llamada | sms
     fuente TEXT NOT NULL,                   -- registro_directo | pagina_web_verificada
     verificado_por TEXT NOT NULL,
     verificado_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -180,16 +181,16 @@ CREATE INDEX idx_llamadas_hash_vence ON llamadas_registradas (telefono_hash, ven
 ---
 
 ## 3. Las 5 Vistas de Solo Lectura para el Dashboard
-El Dashboard Next.js **nunca** lee las tablas base; utiliza vistas anónimas precalculadas:
-1. `vista_radar_por_hora`: Conteo de verificaciones y estafas en bloques de 1 hora (últimas 24h).
-2. `vista_tipos_de_estafa`: Agrupación por modalidad (suplantación bancaria, falso asesor, paquete retenido, etc.).
-3. `vista_campanas_activas`: Lista de campañas con estado activo, volumen de reportes y alerta roja.
-4. `vista_llamadas_verificadas`: Registro de llamadas recientes marcadas como "Real - código ok" o "Falsa - colgó".
-5. `vista_banco_mas_reportados`: Top de números y llaves Bre-B con mayor nivel de riesgo en los últimos 7 días.
+El Dashboard Next.js consulta exclusivamente vistas anónimas precalculadas:
+1. `vista_radar_por_hora`
+2. `vista_tipos_de_estafa`
+3. `vista_campanas_activas`
+4. `vista_llamadas_verificadas`
+5. `vista_banco_mas_reportados`
 
 ---
 
-## 4. Políticas de Seguridad RLS (Row Level Security)
-- Habilitar RLS en las 12 tablas: `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`
-- **Rol Servidor (`service_role`):** Lectura y escritura irrestricta.
-- **Rol Público Dashboard (`anon`):** Acceso concedido únicamente a las 5 vistas públicas de agregación. Prohibido el acceso `SELECT` a las tablas `usuarios`, `llamadas_registradas` y `reportes`.
+## 4. Políticas de Seguridad RLS
+- RLS activo en las 12 tablas.
+- El servidor FastAPI utiliza `service_role` (acceso completo).
+- El Dashboard público en Vercel utiliza la clave anónima (`anon`) con permiso exclusivo `SELECT` sobre las 5 vistas.
