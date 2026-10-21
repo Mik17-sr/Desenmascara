@@ -37,7 +37,7 @@ export function Card({ title, icon: Icon, action, children, className = "", padd
   title?: string; icon?: IconType; action?: ReactNode; children: ReactNode; className?: string; padded?: boolean;
 }) {
   return (
-    <section className={`rise rounded-2xl border border-line bg-surface shadow-card ${className}`}>
+    <section className={`rise flex flex-col rounded-2xl border border-line bg-surface shadow-card ${className}`}>
       {title && (
         <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
@@ -47,7 +47,7 @@ export function Card({ title, icon: Icon, action, children, className = "", padd
           {action}
         </header>
       )}
-      <div className={padded ? "p-5" : ""}>{children}</div>
+      <div className={`flex-1 ${padded ? "p-5" : ""}`}>{children}</div>
     </section>
   );
 }
@@ -64,22 +64,19 @@ function Sparkline({ values }: { values: number[] }) {
   );
 }
 
-export function Kpi({ label, value, suffix = "", decimals = 0, icon: Icon, note, delta, tone, spark, loading }: {
-  label: string; value: number; suffix?: string; decimals?: number; icon: IconType; note?: string;
+/** A compact figure tile, as in the guide's mock-up. tone="brand" fills the tile with the brand's tint. */
+export function Kpi({ label, value, suffix = "", decimals = 0, note, delta, tone, spark, loading }: {
+  label: string; value: number; suffix?: string; decimals?: number; note?: string;
   delta?: number | null; tone?: "high" | "brand"; spark?: number[]; loading?: boolean;
 }) {
   const shown = useCountUp(value);
   const color = tone === "high" ? "text-risk-high" : tone === "brand" ? "text-brand-ink" : "";
+  const tile = tone === "brand" ? "border-brand/30 bg-brand-soft" : "border-line bg-surface";
   return (
-    <div className="rise flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card transition hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted">{label}</span>
-        <span className={`grid h-9 w-9 place-items-center rounded-xl ${tone === "high" ? "bg-risk-high-bg text-risk-high" : "bg-brand-soft text-brand-ink"}`}>
-          <Icon />
-        </span>
-      </div>
-      {loading ? <div className="skeleton mt-3 h-9 w-24" /> : (
-        <div className={`tabular mt-2 text-3xl font-bold tracking-tight sm:text-4xl ${color}`}>
+    <div className={`rise flex flex-col rounded-xl border p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-lg ${tile}`}>
+      <span className="text-xs font-medium text-muted">{label}</span>
+      {loading ? <div className="skeleton mt-2 h-8 w-20" /> : (
+        <div className={`tabular mt-1 text-2xl font-bold tracking-tight sm:text-[28px] ${color}`}>
           {shown.toLocaleString("es-CO", { maximumFractionDigits: decimals, minimumFractionDigits: decimals })}{suffix}
         </div>
       )}

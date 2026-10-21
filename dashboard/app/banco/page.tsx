@@ -88,10 +88,10 @@ export default function BancoPage() {
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Kpi label="Números, llaves y cuentas" value={data?.total ?? 0} icon={Database} loading={!data} note="en el Banco" />
-          <Kpi label="En alto riesgo" value={data?.alto_riesgo ?? 0} icon={AlertTriangle} tone="high" loading={!data} note="nivel 70 o más" />
-          <Kpi label="Reportes esta semana" value={data?.reportes_semana ?? 0} icon={Activity} loading={!data} note={data ? `de ${plural(data.personas_semana, "persona", "personas distintas")}` : undefined} />
-          <Kpi label="Números oficiales" value={data?.oficiales ?? 0} icon={CheckCircle} tone="brand" loading={!data} note="lista blanca verificada" />
+          <Kpi label="Números, llaves y cuentas" value={data?.total ?? 0} loading={!data} note="en el Banco" />
+          <Kpi label="En alto riesgo" value={data?.alto_riesgo ?? 0} tone="high" loading={!data} note="nivel 70 o más" />
+          <Kpi label="Reportes esta semana" value={data?.reportes_semana ?? 0} loading={!data} note={data ? `de ${plural(data.personas_semana, "persona", "personas distintas")}` : undefined} />
+          <Kpi label="Números oficiales" value={data?.oficiales ?? 0} tone="brand" loading={!data} note="lista blanca verificada" />
         </div>
 
         <div className="grid gap-6 xl:grid-cols-3">
