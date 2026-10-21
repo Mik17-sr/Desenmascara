@@ -282,14 +282,14 @@ npm run start                        # http://localhost:3000
 
 Cómo queda protegido: la API se conecta como `postgres` (dueño de las tablas); `anon` y `authenticated` no pueden leer ninguna tabla con datos, solo las vistas agregadas y `eventos_dashboard`, que guarda qué tabla cambió y el nivel de riesgo, sin texto, números ni usuarios. Nunca pongas la llave `service_role` en el Dashboard.
 
-Para probar la migración sin Supabase: `TEST_DATABASE_URL=postgresql://... python -m pytest` corre las 67 pruebas sobre un PostgreSQL vacío con la migración aplicada.
+Para probar la migración sin Supabase: `TEST_DATABASE_URL=postgresql://... python -m pytest` corre las 70 pruebas sobre un PostgreSQL vacío con la migración aplicada.
 
 ---
 
 ## 15. Pruebas y medición
 
 ```powershell
-python -m pytest                     # 67 pruebas: motor, API de punta a punta y bot (sin red ni IA real)
+python -m pytest                     # 70 pruebas: motor, API de punta a punta y bot (sin red ni IA real)
 python scripts/evaluar.py            # mide sensibilidad, falsos positivos y P90 contra la API en marcha
 ```
 
@@ -304,6 +304,18 @@ python scripts/evaluar.py            # mide sensibilidad, falsos positivos y P90
 | Tiempo | mediana 6,4 s; 27 de 30 dentro de los 8 s |
 
 Con otras aplicaciones abiertas la CPU se satura y algunas respuestas pasan de 8 s. Para tener margen hace falta GPU o un LLM en la nube; el modelo se cambia con `OLLAMA_MODEL`.
+
+Comparación de modelos con los 26 casos del CSV (misma máquina con la CPU libre, mismo juez y sin memoria de campañas):
+
+| | `llama3.2` (3B) | `llama3.2:1b` |
+|---|---|---|
+| La IA responde a tiempo (< 7 s) | 26 de 26 | 26 de 26 |
+| Tiempo de la IA | mediana 4,7 s · P90 5,2 s | mediana 3,0 s · P90 3,3 s |
+| Modalidad correcta | 19 de 26 | 15 de 26 |
+| Estafas detectadas | 13 de 14 | 5 de 14 |
+| Falsos positivos | 0 de 12 | 0 de 12 |
+
+El modelo de 1B es más rápido, pero deja pasar 9 de las 14 estafas: nos quedamos con `llama3.2`.
 
 ---
 
