@@ -107,6 +107,27 @@ def test_judge_rules():
     assert injected.risk_level == RiskLevel.HIGH
 
 
+def test_code_notices_are_not_requests():
+    notice = "Tu código de verificación es 482913. No lo compartas con nadie. BancoAndino nunca te lo pedirá."
+    assert extract(notice).aviso_de_codigo
+    legit = judge(evidence(notice, Psicologia("suplantacion_bancaria", "codigo_o_clave", False)))
+    assert legit.risk_level == RiskLevel.LOW  # the model misread it; the rule corrects it
+
+    scam = "Tu código es 774512. No lo compartas. Para recibir tu premio, responde a este número con ese código."
+    assert not extract(scam).aviso_de_codigo
+    assert judge(evidence(scam, Psicologia("falso_premio", "codigo_o_clave", True))).risk_level == RiskLevel.HIGH
+    assert not extract("Te enviamos un código de 6 dígitos por error, ¿me lo reenvías?").aviso_de_codigo
+
+
+def test_known_pattern_asking_for_money_is_high_but_false_relative_stays_suspicious():
+    assert judge(evidence("Vendo moto, consigna el anticipo hoy", Psicologia("falsa_compra", "dinero", False))).risk_level == RiskLevel.HIGH
+    assert judge(evidence("Ma, cambié de número, mándame plata", Psicologia("falso_familiar", "dinero", True))).risk_level == RiskLevel.MEDIUM
+
+
+def test_without_ai_weak_clues_are_inconclusive():
+    assert judge(evidence("BancoAndino: hola", None)).risk_level == RiskLevel.INCONCLUSIVE
+
+
 def test_without_ai_or_signals_it_is_inconclusive():
     assert judge(evidence("Hola", None)).risk_level == RiskLevel.INCONCLUSIVE
     # Other reviews still count when the AI is down

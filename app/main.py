@@ -33,9 +33,11 @@ async def _expire_calls_forever() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    # Load the model before serving, so "Application startup complete" means the first analysis is fast.
+    # Load every model before serving: "Application startup complete" means the first analysis is fast,
+    # and OCR/Whisper loading does not compete for the CPU with the first requests.
     await warm_up()
-    background = [asyncio.create_task(warm_up_models()), asyncio.create_task(_expire_calls_forever())]
+    await warm_up_models()
+    background = [asyncio.create_task(_expire_calls_forever())]
     yield
     for task in background:
         task.cancel()

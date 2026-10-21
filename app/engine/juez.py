@@ -32,7 +32,12 @@ P_NO_PIDE = -15
 P_INYECCION = 20
 P_CAMPANA_MAX = 20
 P_BANCO_MAX = 25
+P_AVISO_CODIGO = -40
 P_PIDE = {"codigo_o_clave": 35, "instalar_app": 30, "mover_dinero": 30, "dinero": 20, "datos_personales": 20, "abrir_enlace": 10}
+# The false relative stays "sospechoso" (the guide's case 2): the Círculo confirms it with the real person.
+STRONG_MODALIDADES = {"suplantacion_bancaria", "falso_asesor", "falsa_compra", "paquete_retenido", "falso_funcionario",
+                      "falso_premio", "falso_empleo"}
+HARMFUL_REQUESTS = {"codigo_o_clave", "instalar_app", "mover_dinero", "dinero", "datos_personales"}
 
 PIDE_LABEL = {
     "codigo_o_clave": "Pide un código o una clave: ningún banco los pide por mensaje ni por llamada.",
@@ -176,9 +181,13 @@ def judge(e: Evidencia) -> AnalysisResult:
         recognized.append(f"Dice ser: {name}")
 
     p = e.psicologia
+    aviso_de_codigo = e.pistas.aviso_de_codigo
+    if aviso_de_codigo:
+        add("AVISO_DE_CODIGO", "Es un aviso que te entrega un código y te pide no compartirlo: no te lo está pidiendo.",
+            "", SignalSource.PISTAS, P_AVISO_CODIGO)
     if p and p.modalidad in MODALIDADES:
         add("MODALIDAD", MODALIDADES[p.modalidad][1], p.modalidad, SignalSource.PSICOLOGO, P_MODALIDAD)
-    if p and p.pide in P_PIDE:
+    if p and p.pide in P_PIDE and not (aviso_de_codigo and p.pide == "codigo_o_clave"):
         add("PIDE_" + p.pide.upper(), PIDE_LABEL[p.pide], p.pide, SignalSource.PSICOLOGO, P_PIDE[p.pide])
         recognized.append(f"Pide: {PIDE_CHIP[p.pide]}")
     presion = (p.presion if p else bool(e.pistas.urgencia))
@@ -211,16 +220,23 @@ def judge(e: Evidencia) -> AnalysisResult:
 
     score = max(0, min(100, sum(s.points for s in signals)))
     pide = p.pide if p else None
+    if aviso_de_codigo and pide == "codigo_o_clave":
+        pide = "nada"
     if imita and pide in ("datos_personales", "codigo_o_clave", "dinero"):
         score = max(score, 85)  # rule: the link impersonates an entity and the message asks for data
     if e.tipo == "llamada" and pide in ("codigo_o_clave", "instalar_app"):
         score = max(score, 85)  # rule: in a call they asked for a code or to install an app
+    if p and p.modalidad in STRONG_MODALIDADES and pide in HARMFUL_REQUESTS:
+        score = max(score, 75)  # rule: a known scam pattern that asks for money, a code or data
     if e.inyeccion or banco_alto:
         score = max(score, 70)  # rule: hidden orders for the AI, or a number the community marked red
+    if aviso_de_codigo and not banco_alto and not e.inyeccion:
+        score = min(score, 30)  # rule: a code notice that asks for nothing back is not a scam by itself
 
     if p is None and e.ia_consultada:
         limitations.append("La revisión con IA no respondió a tiempo; el resultado usa solo las demás revisiones.")
-    if p is None and e.ia_consultada and not any(s.points > 0 for s in signals):
+    if p is None and e.ia_consultada and score < 40:
+        # Without the AI, weak clues alone (a bank's name, an urgent word) are not enough to say "bajo riesgo".
         level = RiskLevel.INCONCLUSIVE
         score = 0
     else:

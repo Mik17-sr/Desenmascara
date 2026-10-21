@@ -20,7 +20,8 @@ CUENTA_PATTERN = re.compile(
     r"(?i)cuenta(?:\s+(?:de\s+)?(?:ahorros|corriente|nequi|daviplata))?\s*(?:n(?:o|ro|úmero)?\.?\s*|#\s*)?(\d[\d\s-]{7,18}\d)"
 )
 AMOUNT_PATTERN = re.compile(r"\$\s?\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{2})?|\$\s?\d+")
-CODE_PATTERN = re.compile(r"(?<![\d$.,])\b\d{4,8}\b(?![\d.,])")
+# 4-8 digits that are not part of an amount such as 45.200 (a final period is fine).
+CODE_PATTERN = re.compile(r"(?<![\d$])(?<!\d[.,])\b\d{4,8}\b(?!\d|[.,]\d)")
 
 # Detection only: whether a message claims to come from one of these. Official domains and
 # numbers come from the entidades table, never from this list.
@@ -30,6 +31,10 @@ KNOWN_NAMES = [
     "Daviplata", "Banco Falabella", "Lulo Bank", "DIAN", "Policía", "Fiscalía", "Secretaría de Movilidad",
     "SIMIT", "Servientrega", "Interrapidisimo", "Coordinadora", "Envia",
 ]
+# "Tu código es 482913. No lo compartas": a notice that hands over a code, which small models
+# read as a request for it. Only counts when the message asks for nothing back.
+CODE_WARNING = re.compile(r"no\s+(?:lo|la)\s+compartas|no\s+compartas|nunca\s+te\s+(?:lo|la)\s+pedir|si\s+no\s+(?:lo|la)\s+(?:solicitaste|pediste)|si\s+no\s+fuiste\s+tu")
+ASKS_BACK = re.compile(r"envi|reenvi|dime|digame|dicta|dictame|compart(?:e|eme|ir)\b|respond|escribe|escribeme|manda|llama\s+al|ingresa|entra\s+a")
 URGENCY_WORDS = [
     "urgente", "inmediat", "hoy mismo", "solo hoy", "ultimo aviso", "bloque", "suspend", "24 horas",
     "48 horas", "embargo", "multa", "no le digas", "no le diga", "antes de que", "ultima oportunidad",
@@ -52,6 +57,7 @@ class Pistas:
     codigos: list[str] = field(default_factory=list)
     entidades: list[str] = field(default_factory=list)
     urgencia: list[str] = field(default_factory=list)
+    aviso_de_codigo: bool = False
 
 
 def extract_urls(text: str) -> list[str]:
@@ -92,13 +98,18 @@ def extract(text: str, entity_names: list[str] | None = None) -> Pistas:
         llaves.append(re.sub(r"\s", "", value) if value[0].isdigit() else value.lower())
     cuentas = [re.sub(r"\D", "", m.group(1)) for m in CUENTA_PATTERN.finditer(text)]
     lowered = plain(text)
+    urls = extract_urls(text)
+    codigos = CODE_PATTERN.findall(AMOUNT_PATTERN.sub(" ", without_phones))
+    # The warning itself contains "compartas", so it is removed before looking for requests.
+    asks_back = ASKS_BACK.search(CODE_WARNING.sub(" ", lowered))
     return Pistas(
-        urls=extract_urls(text),
+        urls=urls,
         telefonos=list(dict.fromkeys(phones)),
         llaves=list(dict.fromkeys(llaves)),
         cuentas=list(dict.fromkeys(cuentas)),
         montos=AMOUNT_PATTERN.findall(text),
-        codigos=CODE_PATTERN.findall(AMOUNT_PATTERN.sub(" ", without_phones)),
+        codigos=codigos,
         entidades=_find_names(text, (entity_names or []) + KNOWN_NAMES),
         urgencia=[w for w in URGENCY_WORDS if w in lowered],
+        aviso_de_codigo=bool(codigos) and bool(CODE_WARNING.search(lowered)) and not asks_back and not urls,
     )

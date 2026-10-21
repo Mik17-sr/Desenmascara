@@ -15,7 +15,7 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_TIMEOUT_SECONDS = 6.5
+OLLAMA_TIMEOUT_SECONDS = 7.0
 # Loading the model and reading the prompt for the first time takes about 15 s on CPU.
 WARM_UP_TIMEOUT = httpx.Timeout(60.0, connect=3.0)
 OLLAMA_KEEP_ALIVE = "1h"
