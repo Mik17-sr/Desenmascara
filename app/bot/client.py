@@ -1,6 +1,5 @@
 """Telegram entry point. All risk evaluation is delegated to the FastAPI API."""
 
-import os
 import re
 from typing import Any
 from urllib.parse import urlsplit
@@ -17,10 +16,11 @@ from telegram.ext import (
     filters,
 )
 
+from app.core.config import settings
 from app.schemas.contract import AnalysisInput, AnalysisResult, RiskLevel
 
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
+API_BASE_URL = settings.API_BASE_URL.rstrip("/")
 ANALYZE_URL = f"{API_BASE_URL}/api/v1/analyze"
 ANALYSIS_TIMEOUT_SECONDS = 8.0
 MAX_INPUT_LENGTH = 4000
@@ -90,7 +90,7 @@ def format_analysis(result: AnalysisResult) -> str:
     # Telegram limits messages to 4096 characters. Leave room for the truncation notice.
     message = "\n".join(lines)
     if len(message) > 3900:
-        message = message[:3850].rsplit("\n", 1)[0] + "\n\n_Resultado abreviado por límite de longitud\._"
+        message = message[:3850].rsplit("\n", 1)[0] + "\n\n_Resultado abreviado por límite de longitud\\._"
     return message
 
 
@@ -147,9 +147,9 @@ def create_application(token: str) -> Application:
 
 
 def main() -> None:
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    token = settings.TELEGRAM_BOT_TOKEN
     if not token:
-        raise SystemExit("Configura TELEGRAM_BOT_TOKEN en el entorno para iniciar el bot.")
+        raise SystemExit("Configura TELEGRAM_BOT_TOKEN en el archivo .env o en el entorno para iniciar el bot.")
     create_application(token).run_polling()
 
 

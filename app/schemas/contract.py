@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field
 
 class RiskLevel(str, Enum):
     LOW = "low"
@@ -25,7 +25,9 @@ class LinkStatus(str, Enum):
     NO_KNOWN_THREAT = "no_known_threat"
 
 class AnalysisInput(BaseModel):
-    text: str = Field(..., max_length=4000, description="Contenido del mensaje a analizar")
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    text: str = Field(..., min_length=1, max_length=4000, description="Contenido del mensaje a analizar")
     source: str = Field(default="telegram", description="Origen de la petición")
     user_ref: Optional[str] = Field(default=None, description="Identificador seudonimizado")
     links: List[str] = Field(default_factory=list, description="URLs extraídas")

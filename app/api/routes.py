@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 
 from app.db import repository
 from app.db.database import SessionLocal
@@ -12,7 +12,7 @@ router = APIRouter()
 
 
 @router.post("/analyze", response_model=AnalysisResult)
-async def analyze(payload: AnalysisInput) -> AnalysisResult:
+async def analyze(payload: AnalysisInput, background_tasks: BackgroundTasks) -> AnalysisResult:
     try:
         result = await analyze_with_ollama(payload)
     except Exception:
@@ -25,9 +25,14 @@ async def analyze(payload: AnalysisInput) -> AnalysisResult:
         )
 
     if SessionLocal is not None:
-        try:
-            await repository.save_analysis(payload, result)
-        except Exception:
-            # Persistence is best-effort; do not expose database errors or affect analysis.
-            logger.warning("Analysis persistence unavailable")
+        # Save after the response is sent, so a slow database never delays the bot.
+        background_tasks.add_task(_save_analysis, payload, result)
     return result
+
+
+async def _save_analysis(payload: AnalysisInput, result: AnalysisResult) -> None:
+    try:
+        await repository.save_analysis(payload, result)
+    except Exception:
+        # Persistence is best-effort; do not expose database errors or affect analysis.
+        logger.warning("Analysis persistence unavailable")

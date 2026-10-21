@@ -16,13 +16,16 @@ OLLAMA_TIMEOUT_SECONDS = 7.0
 WARM_UP_TIMEOUT = httpx.Timeout(60.0, connect=3.0)
 OLLAMA_KEEP_ALIVE = "1h"
 MAX_RESPONSE_TOKENS = 96
+# The model reads about 40 tokens/s, so long messages are cut to their start and end,
+# where the link or the request usually is.
+MAX_MODEL_CHARS = 400
 
 PROMPT_SISTEMA = """
 Eres un experto en ciberseguridad y análisis antifraude. Clasifica el mensaje que te comparte un usuario según el riesgo de estafa, suplantación de identidad o phishing.
 
 Responde ÚNICAMENTE con un JSON con estas claves, en este orden:
 - veredicto: "estafa", "dudoso" o "normal"
-- summary: una sola frase en español, de máximo 15 palabras, que explique el veredicto
+- summary: una frase corta en español, de máximo 8 palabras, que explique el veredicto
 
 Criterios:
 - estafa: pide datos personales, claves, códigos o dinero; ofrece premios o precios irreales a cambio de datos o anticipos; usa enlaces que imitan a una entidad; presiona con urgencia, amenazas o secreto; pide pasar la conversación a otra plataforma.
@@ -39,7 +42,7 @@ RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
         "veredicto": {"type": "string", "enum": ["estafa", "dudoso", "normal"]},
-        "summary": {"type": "string", "maxLength": 160},
+        "summary": {"type": "string", "maxLength": 90},
     },
     "required": ["veredicto", "summary"],
 }
@@ -87,7 +90,7 @@ def _risk_level(score: int) -> RiskLevel:
     return RiskLevel.LOW
 
 
-def _result(verdict: str, summary: str) -> AnalysisResult:
+def _result(verdict: str, summary: str, limitations: list[str] = LIMITATIONS) -> AnalysisResult:
     score = VERDICT_SCORES[verdict]
     level = _risk_level(score)
     return AnalysisResult(
@@ -96,8 +99,15 @@ def _result(verdict: str, summary: str) -> AnalysisResult:
         summary=summary,
         signals=[],
         recommendations=RECOMMENDATIONS[level],
-        limitations=LIMITATIONS,
+        limitations=limitations,
     )
+
+
+def _model_text(text: str) -> str:
+    if len(text) <= MAX_MODEL_CHARS:
+        return text
+    half = MAX_MODEL_CHARS // 2
+    return f"{text[:half]} […] {text[-half:]}"
 
 
 async def _chat(client: AsyncClient, text: str, max_tokens: int):
@@ -127,10 +137,14 @@ async def analyze_with_ollama(payload: AnalysisInput) -> AnalysisResult:
 
     client = AsyncClient(host=settings.OLLAMA_HOST, timeout=OLLAMA_TIMEOUT_SECONDS)
 
+    limitations = LIMITATIONS
+    if len(payload.text) > MAX_MODEL_CHARS:
+        limitations = [*LIMITATIONS, "El mensaje es largo: se analizaron solo el inicio y el final."]
+
     try:
-        response = await _chat(client, payload.text, MAX_RESPONSE_TOKENS)
+        response = await _chat(client, _model_text(payload.text), MAX_RESPONSE_TOKENS)
         data = json.loads(response['message']['content'])
-        return _result(data["veredicto"], data.get("summary") or "No se pudo generar un resumen claro.")
+        return _result(data["veredicto"], data.get("summary") or "No se pudo generar un resumen claro.", limitations)
 
     except Exception as exc:
         logger.warning("Ollama analysis failed: %r", exc)
