@@ -29,7 +29,7 @@ KNOWN_NAMES = [
     "Bancolombia", "Davivienda", "BBVA", "Banco de Bogotá", "Banco Popular", "Banco de Occidente",
     "Banco Caja Social", "Scotiabank Colpatria", "Banco Agrario", "AV Villas", "Itaú", "Nequi",
     "Daviplata", "Banco Falabella", "Lulo Bank", "DIAN", "Policía", "Fiscalía", "Secretaría de Movilidad",
-    "SIMIT", "Servientrega", "Interrapidisimo", "Coordinadora", "Envia",
+    "SIMIT", "Servientrega", "Interrapidisimo",
 ]
 # "Tu código es 482913. No lo compartas": a notice that hands over a code, which small models
 # read as a request for it. Only counts when the message asks for nothing back.

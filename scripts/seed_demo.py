@@ -25,13 +25,13 @@ ENTIDADES = [
     ("BancoAndino", "banco", "bancoandino.com", ["+57 601 000 0002"], "576010000002"),
     ("Tienda Ejemplo", "tienda", "tiendaejemplo.com", ["+57 601 000 0001"], "576010000001"),
 ]
-# (tipo, valor, modalidad, distinct people)
+# (tipo, valor, modalidad, distinct people, red results) — the first one is the guide's example
 REPORTADOS = [
-    ("telefono", "576010000000", "falso_asesor", 29),
-    ("llave", "3150000000", "falsa_compra", 11),
-    ("telefono", "573000000000", "falso_familiar", 9),
-    ("cuenta", "00004417", "falso_empleo", 7),
-    ("telefono", "573200000000", "falsa_compra", 3),
+    ("telefono", "576010000000", "falso_asesor", 29, 31),
+    ("llave", "3150000000", "falsa_compra", 11, 12),
+    ("telefono", "573000000000", "falso_familiar", 9, 4),
+    ("cuenta", "00004417", "falso_empleo", 7, 0),
+    ("telefono", "573200000000", "falsa_compra", 3, 0),
 ]
 
 
@@ -61,9 +61,11 @@ async def main(rotate: bool) -> None:
                 print(f"{nombre} ya existía (su llave no se vuelve a mostrar; usa --nueva-llave).")
             await banco.add_official(db, entidad, "telefono", oficial, "telegram", "registro", nombre)
 
-        for tipo, valor, modalidad, people in REPORTADOS:
+        for tipo, valor, modalidad, people, red in REPORTADOS:
             for user in demo_users[:people]:
-                await banco.report(db, user, tipo, valor, modalidad)
+                indicador, _ = await banco.report(db, user, tipo, valor, modalidad)
+            indicador.consultas_rojo = max(indicador.consultas_rojo, red)
+            await banco.recompute(db, indicador)
         await db.commit()
     print("Datos de prueba listos. Son ficticios: díselo así al jurado.")
 

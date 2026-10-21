@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* Brand of the guide (section 7). Semáforo colors are reserved for risk and always come with their word. */
+:root {
+  --bg: #f6f8fb;
+  --surface: #ffffff;
+  --surface-2: #eef3f8; /* gris niebla */
+  --ink: #1f2a44; /* azul noche */
+  --muted: #5b6475; /* gris pizarra */
+  --line: #dde4ee;
+  --brand: #0e9f8e; /* verde azulado */
+  --brand-ink: #0b7f72; /* verde azulado oscuro: small text and links */
+  --mint: #e3f5f2; /* verde menta */
+  --alert: #e8951c; /* naranja alerta: details only, never text on white */
+  --risk-low: #1e8449;
+  --risk-mid: #d4a017;
+  --risk-mid-ink: #8a6d00;
+  --risk-high: #c0392b;
+  --risk-high-bg: #fdecea;
+  --risk-mid-bg: #fdf5dc;
+  --risk-low-bg: #e6f4ec;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a2338;
+    --surface: #1f2a44;
+    --surface-2: #27344f;
+    --ink: #f3f6fa;
+    --muted: #a9b3c4;
+    --line: #34425f;
+    --brand: #2bb5a3;
+    --brand-ink: #2bb5a3;
+    --mint: #1d3d45;
+    --risk-mid-ink: #e8c14a;
+    --risk-high-bg: #3d2228;
+    --risk-mid-bg: #3a3320;
+    --risk-low-bg: #1e3a2c;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-mint: var(--mint);
+  --color-alert: var(--alert);
+  --color-risk-low: var(--risk-low);
+  --color-risk-mid: var(--risk-mid);
+  --color-risk-mid-ink: var(--risk-mid-ink);
+  --color-risk-high: var(--risk-high);
+  --color-risk-high-bg: var(--risk-high-bg);
+  --color-risk-mid-bg: var(--risk-mid-bg);
+  --color-risk-low-bg: var(--risk-low-bg);
+  --font-sans: var(--font-inter), Arial, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, Consolas, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-inter), Arial, sans-serif;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pulse-alert {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(192, 57, 43, 0); }
+}
+
+.pulse-alert {
+  animation: pulse-alert 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-alert { animation: none; }
+}
