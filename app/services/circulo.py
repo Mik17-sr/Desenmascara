@@ -4,6 +4,7 @@ On Telegram a bot cannot write first, so the protected person sends the relative
 link; opening it is the relative's consent and lets the bot write to them later.
 """
 
+import re
 import secrets
 from uuid import UUID
 
@@ -83,7 +84,7 @@ async def pending_names(session: AsyncSession, protegido: Usuario) -> list[str]:
 
 
 def mentioned(text: str, candidates: list[tuple[MiembroCirculo, Usuario]]) -> list[tuple[MiembroCirculo, Usuario]]:
-    words = set(plain(text).replace(",", " ").split())
+    words = set(re.findall(r"\w+", plain(text)))
     return [(m, u) for m, u in candidates if plain(m.nombre).split()[0] in words]
 
 
