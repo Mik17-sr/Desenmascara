@@ -1,5 +1,7 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Literal
+from datetime import datetime
+from uuid import UUID
 from pydantic import BaseModel, Field, HttpUrl
 
 class RiskLevel(str, Enum):
@@ -25,7 +27,7 @@ class LinkStatus(str, Enum):
     NO_KNOWN_THREAT = "no_known_threat"
 
 class AnalysisInput(BaseModel):
-    text: str = Field(..., max_length=4000, description="Contenido del mensaje a analizar")
+    text: str = Field(..., min_length=1, max_length=4000, description="Contenido del mensaje a analizar")
     source: str = Field(default="telegram", description="Origen de la petición")
     user_ref: Optional[str] = Field(default=None, description="Identificador seudonimizado")
     links: List[str] = Field(default_factory=list, description="URLs extraídas")
@@ -53,3 +55,24 @@ class AnalysisResult(BaseModel):
     links: List[LinkAnalysis] = Field(default_factory=list)
     limitations: List[str] = Field(default_factory=list)
     analysis_version: str = "v1"
+
+class FeedbackInput(BaseModel):
+    analysis_id: UUID
+    feedback_type: Literal["useful", "false_positive", "incorrect"]
+    comment: Optional[str] = Field(default=None, max_length=500)
+
+class FeedbackResult(BaseModel):
+    id: UUID
+    analysis_id: UUID
+    feedback_type: str
+    comment: Optional[str] = None
+
+class HistoryItem(BaseModel):
+    id: UUID
+    created_at: datetime
+    source: str
+    user_ref: Optional[str] = None
+    risk_level: str
+    risk_score: int
+    summary: str
+    analysis_version: str
