@@ -17,6 +17,11 @@ export function n(value: number): string {
   return number.format(value);
 }
 
+/** The count with the right word: "1 reporte", "3 reportes". */
+export function plural(value: number, one: string, many: string): string {
+  return `${n(value)} ${value === 1 ? one : many}`;
+}
+
 export function ago(iso: string | null | undefined): string {
   if (!iso) return "";
   const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);

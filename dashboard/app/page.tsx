@@ -9,7 +9,7 @@ import {
 } from "@/components/icons";
 import { Card, Empty, GrowBar, Kpi, LevelPill, LiveDot, Notice, PageHeader, Skeleton } from "@/components/ui";
 import { api, type Radar } from "@/lib/api";
-import { ago, LEVELS, n } from "@/lib/format";
+import { ago, LEVELS, n, plural } from "@/lib/format";
 import { useLive } from "@/lib/useLive";
 import { useNow } from "@/lib/useNow";
 
@@ -76,7 +76,7 @@ export default function RadarPage() {
           <Kpi label="Verificaciones hoy" value={data?.verificaciones_hoy ?? 0} icon={Activity} loading={!data}
                delta={change} note={change === null ? "sin datos de ayer" : "vs. ayer"} spark={spark} />
           <Kpi label="Alto riesgo" value={data?.alto_riesgo_pct ?? 0} suffix=" %" icon={AlertTriangle} tone="high" loading={!data}
-               note={data ? `${n(data.alto_riesgo_total)} mensajes en rojo` : undefined} />
+               note={data ? `${plural(data.alto_riesgo_total, "mensaje", "mensajes")} en rojo` : undefined} />
           <Kpi label="Llamadas reportadas" value={data?.llamadas_reportadas ?? 0} icon={Phone} loading={!data} note="por número o nota de voz" />
           <Kpi label="Llamadas verificadas" value={data?.llamadas_verificadas ?? 0} icon={CheckCircle} tone="brand" loading={!data} note="confirmadas con la entidad" />
           <Kpi label="Campañas activas" value={data?.campanas_activas ?? 0} icon={Megaphone} loading={!data} note="últimas 24 horas" />
@@ -131,7 +131,7 @@ export default function RadarPage() {
                         <li key={c.id} className={`rounded-xl border px-3.5 py-2.5 transition hover:shadow-card ${hot ? "border-risk-high/40 bg-risk-high-bg" : "border-line bg-surface-2"}`}>
                           <div className="line-clamp-2 text-sm font-semibold">{c.nombre}</div>
                           <div className={`mt-0.5 flex items-center gap-1.5 text-xs ${hot ? "text-risk-high" : "text-muted"}`}>
-                            {hot && <LiveDot tone="high" />}{n(c.reportes)} reportes · último {ago(c.ultimo)}
+                            {hot && <LiveDot tone="high" />}{plural(c.reportes, "reporte", "reportes")} · último {ago(c.ultimo)}
                           </div>
                         </li>
                       );

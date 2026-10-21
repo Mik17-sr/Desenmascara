@@ -67,6 +67,13 @@ def test_analysis_leads_with_the_semaforo_and_says_what_to_do():
     assert first.startswith("🔴 *ALTO RIESGO · 96/100*") and "Qué hacer:" in message and len(message.split("\n")) <= 10
 
 
+def test_counts_of_one_read_well():
+    number = format_number({"encontrado": True, "valor": "+57 320 ••• 1234", "nivel": 72, "personas": 1, "reportes": 1, "estado": "normal"})
+    assert "*1 reporte* de 1 persona\\." in number
+    assert "*1 persona* que lo reportó\\." in format_report({"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 1})
+    assert "*3 personas* que lo reportaron\\." in format_report({"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 3})
+
+
 # --- Handlers with fake Telegram and API objects ------------------------------------------------
 
 class FakeApi:

@@ -6,7 +6,7 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import { Activity, AlertTriangle, CheckCircle, Database, Key, Search, Users } from "@/components/icons";
 import { Button, Card, Empty, Kpi, LevelPill, Notice, PageHeader, Skeleton } from "@/components/ui";
 import { ApiError, api, postJSON, type BancoView, type Lookup } from "@/lib/api";
-import { ago, levelOf, n } from "@/lib/format";
+import { ago, levelOf, n, plural } from "@/lib/format";
 import { useLive } from "@/lib/useLive";
 
 const TEAM_KEY = "desenmascara.equipo";
@@ -81,7 +81,7 @@ export default function BancoPage() {
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <span className="tabular text-lg font-bold">{found.valor ?? search}</span>
               <LevelPill level={found.oficial_de ? "low" : levelOf(found.nivel)} score={found.nivel} word={found.palabra} />
-              <span className="text-muted">{n(found.personas)} personas · {n(found.reportes)} reportes{found.modalidad ? ` · ${found.modalidad}` : ""}</span>
+              <span className="text-muted">{plural(found.personas, "persona", "personas")} · {plural(found.reportes, "reporte", "reportes")}{found.modalidad ? ` · ${found.modalidad}` : ""}</span>
               {found.oficial_de && <span className="font-medium text-brand-ink">Número oficial de {found.oficial_de}</span>}
             </div>
           </Card>
@@ -90,7 +90,7 @@ export default function BancoPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Kpi label="Números, llaves y cuentas" value={data?.total ?? 0} icon={Database} loading={!data} note="en el Banco" />
           <Kpi label="En alto riesgo" value={data?.alto_riesgo ?? 0} icon={AlertTriangle} tone="high" loading={!data} note="nivel 70 o más" />
-          <Kpi label="Reportes esta semana" value={data?.reportes_semana ?? 0} icon={Activity} loading={!data} note={data ? `de ${n(data.personas_semana)} personas distintas` : undefined} />
+          <Kpi label="Reportes esta semana" value={data?.reportes_semana ?? 0} icon={Activity} loading={!data} note={data ? `de ${plural(data.personas_semana, "persona", "personas distintas")}` : undefined} />
           <Kpi label="Números oficiales" value={data?.oficiales ?? 0} icon={CheckCircle} tone="brand" loading={!data} note="lista blanca verificada" />
         </div>
 
@@ -140,7 +140,7 @@ export default function BancoPage() {
                       <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted)" }} axisLine={false} tickLine={false} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} axisLine={false} tickLine={false} />
-                      <Tooltip cursor={{ fill: "var(--surface-2)" }} formatter={(v) => [`${v} reportes`, ""]}
+                      <Tooltip cursor={{ fill: "var(--surface-2)" }} formatter={(v) => [plural(Number(v), "reporte", "reportes"), ""]}
                                contentStyle={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, color: "var(--ink)" }} />
                       <Bar dataKey="total" radius={[6, 6, 0, 0]} label={{ position: "top", fontSize: 11, fill: "var(--ink)" }} animationDuration={800}>
                         {days.map((d) => <Cell key={d.label} fill={d.today ? "var(--brand-ink)" : "var(--brand)"} fillOpacity={d.today ? 1 : 0.7} />)}

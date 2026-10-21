@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 from app.engine.analyzer import Psicologia
 from app.engine.enlaces import DomainAge, LinkCheck
-from app.engine.pistas import Pistas
+from app.engine.pistas import Pistas, plural
 from app.schemas.contract import (
     AnalysisResult,
     CampaignMatch,
@@ -202,7 +202,7 @@ def judge(e: Evidencia) -> AnalysisResult:
     if e.campana and e.campana.similitud >= 0.6:
         points = round(P_CAMPANA_MAX * min(1.0, (e.campana.similitud - 0.6) / 0.4))
         pct = round(e.campana.similitud * 100)
-        add("CAMPANA_ACTIVA", f"Es muy parecido ({pct} %) a una campaña reportada {e.campana.reportes_hoy} veces hoy.",
+        add("CAMPANA_ACTIVA", f"Es muy parecido ({pct} %) a una campaña reportada {plural(e.campana.reportes_hoy, 'vez', 'veces')} hoy.",
             e.campana.nombre, SignalSource.ARCHIVISTA, points)
 
     banco_alto = False
@@ -215,7 +215,7 @@ def judge(e: Evidencia) -> AnalysisResult:
             recognized.append(f"{hit.visible}: en revisión")
         elif hit.nivel >= 40:
             points = min(P_BANCO_MAX, round(hit.nivel / 4))
-            add("BANCO_REPORTADO", f"{name} {hit.visible} tiene {hit.reportes} reportes de {hit.personas} personas.",
+            add("BANCO_REPORTADO", f"{name} {hit.visible} tiene {plural(hit.reportes, 'reporte', 'reportes')} de {plural(hit.personas, 'persona', 'personas')}.",
                 hit.modalidad or "", SignalSource.BANCO, points)
             banco_alto = banco_alto or hit.nivel >= 70
 
