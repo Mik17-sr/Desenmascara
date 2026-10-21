@@ -47,6 +47,11 @@ def plain(text: str) -> str:
     return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
 
+def plural(count: int, one: str, many: str) -> str:
+    """The count with the right word: '1 vez', '3 veces'."""
+    return f"{count} {one if count == 1 else many}"
+
+
 @dataclass
 class Pistas:
     urls: list[str] = field(default_factory=list)

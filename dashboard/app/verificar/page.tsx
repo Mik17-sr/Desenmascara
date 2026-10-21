@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Activity, AlertTriangle, CheckCircle, Database, ImageIcon, Link2, Message, Phone, ShieldCheck } from "@/components/icons";
 import { Button, Card, Chip, Empty, LevelPill, Notice, PageHeader, RayosX, ScoreGauge, Skeleton } from "@/components/ui";
 import { ApiError, api, postJSON, type AnalysisResult, type Lookup } from "@/lib/api";
-import { LEVELS, levelOf, n } from "@/lib/format";
+import { LEVELS, levelOf, n, plural } from "@/lib/format";
 
 type Tab = "texto" | "captura" | "numero";
 const TABS: { id: Tab; label: string; icon: typeof Message }[] = [
@@ -131,7 +131,7 @@ export default function VerificarPage() {
                   <div className="rounded-xl border border-risk-high/30 bg-risk-high-bg px-4 py-3 text-sm">
                     <div className="text-xs font-semibold uppercase tracking-wide text-risk-high">Parecido a una campaña</div>
                     <div className="mt-0.5 font-semibold">{result.campaign.name}</div>
-                    <div className="text-xs text-risk-high">{n(result.campaign.total_reports_today)} reportes hoy · parecido {result.campaign.similarity_pct} %</div>
+                    <div className="text-xs text-risk-high">{plural(result.campaign.total_reports_today, "reporte", "reportes")} hoy · parecido {result.campaign.similarity_pct} %</div>
                   </div>
                 )}
               </div>

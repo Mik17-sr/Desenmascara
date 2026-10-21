@@ -8,6 +8,7 @@ Rules from the guide (section 8): the semáforo with its word on the first line,
 import re
 from typing import Any
 
+from app.engine.pistas import plural
 from app.schemas.contract import AnalysisResult
 
 MARKDOWN_V2_SPECIALS = re.compile(r"([_\*\[\]()~`>#+\-=|{}.!\\])")
@@ -128,11 +129,12 @@ def format_number(info: dict) -> str:
         )
     level = "high" if info["nivel"] >= 70 else ("medium" if info["nivel"] >= 40 else "low")
     dot, word = SEMAFORO[level]
-    reportes, personas = info["reportes"], info["personas"]
+    reportes = plural(info["reportes"], "reporte", "reportes")
+    personas = plural(info["personas"], "persona", "personas")
     modalidad = f" como «{info['modalidad'].lower()}»" if info.get("modalidad") else ""
     return join(
         f"{dot} {b(word + ' · ' + valor)}",
-        f"{b(f'{reportes} reportes')} {esc(f'de {personas} personas{modalidad}.')}",
+        f"{b(reportes)} {esc(f'de {personas}{modalidad}.')}",
         f"{b('Ojo:')} {esc('el número que ves en pantalla se puede falsificar.')}",
         f"{b('Qué hacer:')} {esc('cuelga y llama tú a la línea oficial de tu tarjeta.')}",
         esc("¿Te pidieron un código? Cuéntame la llamada en una nota de voz."),
@@ -142,8 +144,10 @@ def format_number(info: dict) -> str:
 def format_report(info: dict) -> str:
     if not info["nuevo"]:
         return esc("Ya tenías un reporte de este número: cada persona cuenta una sola vez. Gracias por proteger a otros.")
+    personas = info["personas"]
     return join(
         b("Reportado"),
-        f"{esc(info['valor'])} {esc('ya tiene')} {b(str(info['personas']) + ' personas')} {esc('que lo reportaron.')}",
+        f"{esc(info['valor'])} {esc('ya tiene')} {b(plural(personas, 'persona', 'personas'))} "
+        f"{esc('que lo reportó.' if personas == 1 else 'que lo reportaron.')}",
         esc("Si alguien más pregunta por él, le avisaremos. Gracias por proteger a otros."),
     )
