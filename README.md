@@ -256,6 +256,8 @@ En otra terminal, el bot (pon antes tu token de @BotFather en `TELEGRAM_BOT_TOKE
 python -m app.bot.client
 ```
 
+Al arrancar, el bot se pone el perfil del manual: nombre «Desenmascara», descripción «bot antiestafas», menú de comandos y el logo (`app/bot/assets/avatar.png`) si todavía no tiene foto. Solo envía a Telegram lo que cambió.
+
 Y el Dashboard:
 
 ```powershell

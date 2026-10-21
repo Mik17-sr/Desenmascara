@@ -33,6 +33,11 @@ def it(value: Any) -> str:
     return f"_{esc(value)}_"
 
 
+def code(value: Any) -> str:
+    """Inline code: Telegram draws it in a box and copies it with one tap. Inside, only ` and \\ are special."""
+    return "`" + str(value).replace("\\", "\\\\").replace("`", "\\`") + "`"
+
+
 def join(*lines: str) -> str:
     message = "\n".join(line for line in lines if line is not None)
     # Telegram limits messages to 4096 characters. Leave room for the truncation notice.
@@ -79,7 +84,7 @@ def format_call(info: dict) -> str:
             f"{b(entidad)} {esc('te está llamando.')}",
             f"{esc('Motivo:')} {b(info['motivo'])}{esc('.')}",
             esc("Pídele a quien te llama que te diga este código:"),
-            b(" ".join(info["codigo"])),
+            code(" ".join(info["codigo"])),
             f"{esc('Si no lo sabe,')} {b('cuelga')}{esc('.')}",
         )
     lineas = info.get("lineas_oficiales") or []

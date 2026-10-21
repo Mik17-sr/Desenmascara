@@ -4,8 +4,10 @@
 """
 
 import logging
+from pathlib import Path
 
-from telegram import BotCommand, Update
+from telegram import Bot, BotCommand, InputProfilePhotoStatic, Update
+from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -29,10 +31,40 @@ COMMANDS = [
     BotCommand("borrar", "Borrar mis datos"),
 ]
 
+# The bot's profile, as in the guide: the platform's name, "bot antiestafas" and the mask logo.
+AVATAR = Path(__file__).parent / "assets" / "avatar.png"
+NOMBRE = "Desenmascara"
+DESCRIPCION_CORTA = "Bot antiestafas: reenvía el mensaje, la captura, el número o la nota de voz y te digo si es una estafa."
+DESCRIPCION = (
+    "Reenvía el mensaje. Desenmascara la estafa.\n\n"
+    "Envíame un mensaje, una captura, el número que te llamó o una nota de voz y en segundos te doy un semáforo "
+    "(🟢 bajo riesgo, 🟡 sospechoso o 🔴 alto riesgo), el porqué y qué hacer.\n\n"
+    "Cuando puedo, confirmo con la fuente: tu banco con Llamada Verificada o tu familiar con el Círculo de Confianza.\n\n"
+    "Solo leo lo que tú me envíes."
+)
+
+logger = logging.getLogger(__name__)
+
+
+async def _profile(bot: Bot) -> None:
+    """Send only what differs: Telegram rate-limits these calls. The logo goes up once, when there is no photo."""
+    if (await bot.get_my_name()).name != NOMBRE:
+        await bot.set_my_name(NOMBRE)
+    if (await bot.get_my_short_description()).short_description != DESCRIPCION_CORTA:
+        await bot.set_my_short_description(DESCRIPCION_CORTA)
+    if (await bot.get_my_description()).description != DESCRIPCION:
+        await bot.set_my_description(DESCRIPCION)
+    if not (await bot.get_user_profile_photos(bot.id, limit=1)).total_count:
+        await bot.set_my_profile_photo(InputProfilePhotoStatic(AVATAR.read_bytes()))
+
 
 async def _post_init(application: Application) -> None:
     application.bot_data["api"] = Api()
     await application.bot.set_my_commands(COMMANDS)
+    try:
+        await _profile(application.bot)
+    except TelegramError as exc:  # a rate limit must not stop the bot
+        logger.warning("Could not update the bot profile: %r", exc)
 
 
 async def _post_shutdown(application: Application) -> None:
