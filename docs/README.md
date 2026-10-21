@@ -168,6 +168,6 @@ npm run dev
 
 ## 10. Equipo de Trabajo (Colombia 5.0)
 - **Luis Guillermo Nieto Patiño:** IA, Datos, Cerebro de 6 revisiones y Detección de Falso Familiar.
-- **Miguel:** Backend, Arquitectura de Integración, APIs de Llamada Verificada y Supabase.
+- **Miguel Sierra:** Backend, Arquitectura de Integración, APIs de Llamada Verificada y Supabase.
 - **Gerhard Arce:** Módulo de Llamadas, Banco de Números, Bot de Telegram y Dashboard.
-- **IngBocadillo:** Dirección de Producto, Dataset, Ciberseguridad, QA y Pitch.
+- **Tomas Lancheros:** Dirección de Producto, Dataset, Ciberseguridad, QA y Pitch.
