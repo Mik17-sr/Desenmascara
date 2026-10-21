@@ -1,7 +1,8 @@
-"""Revisión 3 · El detective de enlaces: official site, look-alikes and domain age.
+"""Revisión 3 · El detective de enlaces: official site, look-alikes, domain age and reputation lists.
 
 Links are never opened: only the domain name is compared and its public registration (RDAP)
-is queried, with a short timeout, on a fixed host.
+is queried, with a short timeout, on a fixed host. With a key, the link text is also looked up
+in Google Safe Browsing and URLhaus, again on fixed hosts.
 """
 
 import asyncio
@@ -18,6 +19,7 @@ from app.core.config import settings
 RDAP_URL = "https://rdap.org/domain/{}"
 RDAP_TIMEOUT = httpx.Timeout(2.5, connect=1.5)
 SAFE_BROWSING_URL = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
+URLHAUS_URL = "https://urlhaus-api.abuse.ch/v1/url/"
 SECOND_LEVEL_SUFFIXES = {"com.co", "gov.co", "org.co", "edu.co", "net.co", "mil.co", "nom.co", "co.uk", "com.mx", "com.ar", "com.br"}
 HOMOGLYPHS = str.maketrans({"0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a"})
 _age_cache: dict[str, tuple[float, "DomainAge"]] = {}
@@ -131,6 +133,30 @@ async def safe_browsing(urls: list[str]) -> set[str]:
     except httpx.HTTPError:
         return set()
     return {m["threat"]["url"] for m in response.json().get("matches", [])}
+
+
+async def urlhaus(urls: list[str]) -> set[str]:
+    """Links abuse.ch's URLhaus lists as malware sites. Off unless URLHAUS_AUTH_KEY is set (free at auth.abuse.ch)."""
+    if not settings.URLHAUS_AUTH_KEY or not urls:
+        return set()
+
+    async def listed(client: httpx.AsyncClient, url: str) -> bool:
+        try:
+            response = await client.post(URLHAUS_URL, data={"url": url})
+            response.raise_for_status()
+            return response.json().get("query_status") == "ok"
+        except (httpx.HTTPError, ValueError):
+            return False
+
+    async with httpx.AsyncClient(timeout=RDAP_TIMEOUT, headers={"Auth-Key": settings.URLHAUS_AUTH_KEY}) as client:
+        found = await asyncio.gather(*(listed(client, u) for u in urls))
+    return {u for u, hit in zip(urls, found) if hit}
+
+
+async def reputation(urls: list[str]) -> set[str]:
+    """Links already reported as dangerous by Google Safe Browsing or URLhaus."""
+    google, abuse = await asyncio.gather(safe_browsing(urls), urlhaus(urls))
+    return google | abuse
 
 
 async def domain_ages(domains: list[str]) -> dict[str, DomainAge]:

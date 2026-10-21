@@ -226,7 +226,7 @@ Esta versión implementa la guía del proyecto (`docs/`, v7.0) con tres cambios:
   |---|---|---|
   | 1 · Traductor | `traductor.py` | OCR (RapidOCR) y notas de voz (faster-whisper), en memoria |
   | 2 · Pistas | `pistas.py` | Reglas: enlaces, teléfonos, llaves Bre-B, cuentas, montos, códigos |
-  | 3 · Enlaces | `enlaces.py` | Sitio oficial, imitaciones (homoglifos, punycode, casi iguales), edad con RDAP, Safe Browsing opcional |
+  | 3 · Enlaces | `enlaces.py` | Sitio oficial, imitaciones (homoglifos, punycode, casi iguales), edad con RDAP; Safe Browsing y URLhaus si hay llave |
   | 4 · Psicólogo | `analyzer.py` | IA: modalidad, qué pide, si presiona. Respuesta con esquema JSON fijo |
   | 5 · Archivista | `archivista.py` | Huellas MinHash para reconocer campañas aunque cambien palabras |
   | 6 · Juez | `juez.py` | Puntos y reglas de la sección 12; cada punto tiene una razón (Rayos X) |
@@ -313,7 +313,7 @@ Con otras aplicaciones abiertas la CPU se satura y algunas respuestas pasan de 8
 |---|---|
 | Autenticidad del canal | El bot llama a la API con `BOT_API_SECRET`; usa polling, así que no hay webhook que firmar. |
 | Inyección de instrucciones | Mensaje aislado entre comillas, esquema JSON fijo, regla que detecta órdenes (+20 y mínimo alto riesgo) y el juez decide. |
-| Enlaces y SSRF | Los enlaces nunca se abren: solo se compara el nombre y se consulta RDAP en un host fijo, con tiempo límite. |
+| Enlaces y SSRF | Los enlaces nunca se abren: solo se compara el nombre y se consulta RDAP en un host fijo, con tiempo límite. Con llave (`GOOGLE_SAFE_BROWSING_KEY`, `URLHAUS_AUTH_KEY`), el texto del enlace se busca en Safe Browsing y URLhaus, también en hosts fijos. |
 | Rate limiting | 20 consultas por minuto por IP en lo público y 12 por persona en el bot. |
 | Secretos | En `.env` (ignorado por git), generados por `setup_local.py`. Falta gitleaks en CI. |
 | Acceso a datos | RLS en las 13 tablas de Supabase y permisos revocados a `anon`/`authenticated`; el Dashboard solo lee agregados anónimos; entidades con llave (guardada como hash). |
