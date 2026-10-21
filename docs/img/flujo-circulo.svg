@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="960" height="520" role="img" aria-labelledby="titulo"><title id="titulo">Círculo de Confianza: te llega un mensaje de alguien que dice ser tu familiar y pide plata. Lo reenvías, el bot lo marca sospechoso y le pregunta a tu familiar en su Telegram si fue él. Si responde que no, te avisa que es una estafa y alerta al resto de tu Círculo.</title><style>
+svg{--card:#f4f6f5;--box:#ffffff;--ink:#131a18;--muted:#5f6b68;--line:#d5dedb;--edge:#97a9a5;
+--brand:#0e9f8e;--brand-ink:#0b7f72;--brand-soft:#e3f5f2;--bubble:#eef3f1;
+--low:#1e8449;--mid:#b7860b;--high:#c0392b;--low-soft:#d6ede0;--mid-soft:#f6e9c2;--high-soft:#f7d9d5}
+@media (prefers-color-scheme:dark){svg{--card:#0b100f;--box:#131b1a;--ink:#e9efee;--muted:#94a3a0;--line:#26332f;
+--edge:#55706a;--brand:#2bb5a3;--brand-ink:#3cc9b6;--brand-soft:#12312c;--bubble:#1a2422;
+--low:#3fb071;--mid:#e0b33a;--high:#e5544a;--low-soft:#143222;--mid-soft:#322a14;--high-soft:#351a19}}
+text{font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;fill:var(--ink)}
+.h1{font-size:22px;font-weight:700}
+.sub{font-size:14px;fill:var(--muted)}
+.t{font-size:15px;font-weight:600}
+.tb{font-size:13.5px;font-weight:600}
+.s{font-size:12.5px;fill:var(--muted)}
+.m{font-size:12.5px}
+.xs{font-size:11px;fill:var(--muted)}
+.tag{font-size:10.5px;fill:var(--muted);letter-spacing:.03em}
+.mono{font-family:ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;font-weight:700}
+.b{font-weight:700}
+.card{fill:var(--card)}
+.box{fill:var(--box);stroke:var(--line);stroke-width:1.2}
+.act{fill:var(--brand-soft);stroke:var(--brand);stroke-width:2}
+.done{fill:none;stroke:var(--brand);stroke-width:1.5;stroke-opacity:.55}
+.frame{fill:none;stroke:var(--line);stroke-width:1.2;stroke-dasharray:4 4}
+.edge{fill:none;stroke:var(--edge);stroke-width:1.6}
+.reply{stroke-dasharray:6 4}
+.call{stroke-dasharray:2 4;stroke-width:2}
+.loop{fill:none;stroke:var(--brand);stroke-width:1.8;stroke-dasharray:6 5}
+.life{stroke:var(--line);stroke-width:1.4;stroke-dasharray:3 5}
+.badge{fill:var(--brand-soft)}
+.badge-n{font-size:12.5px;font-weight:700;fill:var(--brand-ink)}
+.chk{fill:var(--brand)}
+.chk-p{fill:none;stroke:var(--box);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pkt{fill:var(--brand)}
+.halo{fill:var(--brand);opacity:.22}
+.bubble{fill:var(--bubble)}
+.rail{fill:var(--line)}
+.rail-f{fill:var(--brand)}
+.low{fill:var(--low)}.mid{fill:var(--mid)}.high{fill:var(--high)}
+.low-s{fill:var(--low-soft)}.mid-s{fill:var(--mid-soft)}.high-s{fill:var(--high-soft)}
+.bar{fill:var(--edge);opacity:.55}
+.pill{fill:var(--brand)}
+.pill-t{font-size:11.5px;font-weight:700;fill:var(--box)}
+.chip{fill:var(--box);stroke:var(--line);stroke-width:1.2}
+.ring{fill:none;stroke:var(--high);stroke-width:2}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+@keyframes k1{0.000%{opacity:0;}4.286%{opacity:0;}5.714%{opacity:1;}90.000%{opacity:1;}92.857%{opacity:0;}100.000%{opacity:0;}}
+@keyframes k2{0.000%{transform:translate(120.0px,186.0px);opacity:0}5.000%{transform:translate(120.0px,186.0px);opacity:0}5.357%{transform:translate(120.0px,186.0px);opacity:1}9.643%{transform:translate(360.0px,186.0px);opacity:1}10.000%{transform:translate(360.0px,186.0px);opacity:0}100.000%{transform:translate(360.0px,186.0px);opacity:0}}
+@keyframes k3{0.000%{opacity:0;transform:translateY(3px)}9.286%{opacity:0;transform:translateY(3px)}11.071%{opacity:1;transform:translateY(0)}90.000%{opacity:1;transform:translateY(0)}92.857%{opacity:0;transform:translateY(0)}100.000%{opacity:0;transform:translateY(3px)}}
+@keyframes k4{0.000%{opacity:0;}14.286%{opacity:0;}15.714%{opacity:1;}90.000%{opacity:1;}92.857%{opacity:0;}100.000%{opacity:0;}}
+@keyframes k5{0.000%{transform:translate(360.0px,228.0px);opacity:0}15.000%{transform:translate(360.0px,228.0px);opacity:0}15.357%{transform:translate(360.0px,228.0px);opacity:1}19.643%{transform:translate(600.0px,228.0px);opacity:1}20.000%{transform:translate(600.0px,228.0px);opacity:0}100.000%{transform:translate(600.0px,228.0px);opacity:0}}
+@keyframes k6{0.000%{opacity:0;transform:translateY(3px)}19.286%{opacity:0;transform:translateY(3px)}21.071%{opacity:1;transform:translateY(0)}90.000%{opacity:1;transform:translateY(0)}92.857%{opacity:0;transform:translateY(0)}100.000%{opacity:0;transform:translateY(3px)}}
+@keyframes k7{0.000%{opacity:0;}24.286%{opacity:0;}25.714%{opacity:1;}90.000%{opacity:1;}92.857%{opacity:0;}100.000%{opacity:0;}}
+@keyframes k8{0.000%{transform:translate(600.0px,270.0px);opacity:0}25.000%{transform:translate(600.0px,270.0px);opacity:0}25.357%{transform:translate(600.0px,270.0px);opacity:1}29.643%{transform:translate(360.0px,270.0px);opacity:1}30.000%{transform:translate(360.0px,270.0px);opacity:0}100.000%{transform:translate(360.0px,270.0px);opacity:0}}
+@keyframes k9{0.000%{opacity:0;transform:translateY(3px)}29.286%{opacity:0;transform:translateY(3px)}31.071%{opacity:1;transform:translateY(0)}90.000%{opacity:1;transform:translateY(0)}92.857%{opacity:0;transform:translateY(0)}100.000%{opacity:0;transform:translateY(3px)}}
+@keyframes k10{0.000%{opacity:0;}34.286%{opacity:0;}35.714%{opacity:1;}90.000%{opacity:1;}92.857%{opacity:0;}100.000%{opacity:0;}}
+@keyframes k11{0.000%{transform:translate(600.0px,312.0px);opacity:0}35.000%{transform:translate(600.0px,312.0px);opacity:0}35.357%{transform:translate(600.0px,312.0px);opacity:1}39.643%{transform:translate(840.0px,312.0px);opacity:1}40.000%{transform:translate(840.0px,312.0px);opacity:0}100.000%{transform:translate(840.0px,312.0px);opacity:0}}
+@keyframes k12{0.000%{opacity:0;transform:translateY(3px)}39.286%{opacity:0;transform:translateY(3px)}41.071%{opacity:1;transform:translateY(0)}90.000%{opacity:1;transform:translateY(0)}92.857%{opacity:0;transform:translateY(0)}100.000%{opacity:0;transform:translateY(3px)}}
+@keyframes k13{0.000%{opacity:0;}44.286%{opacity:0;}45.714%{opacity:1;}90.000%{opacity:1;}92.857%{opacity:0;}100.000%{opacity:0;}}
+@keyframes k14{0.000%{transform:translate(840.0px,354.0px);opacity:0}45.000%{transform:translate(840.0px,354.0px);opacity:0}45.357%{transform:translate(840.0px,354.0px);opacity:1}49.643%{transform:translate(600.0px,354.0px);opacity:1}50.000%{transform:translate(600.0px,354.0px);opacity:0}100.000%{transform:translate(600.0px,354.0px);opacity:0}}
+@keyframes k15{0.000%{opacity:0;transform:translateY(3px)}49.286%{opacity:0;transform:translateY(3px)}51.071%{opacity:1;transform:translateY(0)}90.000%{opacity:1;transform:translateY(0)}92.857%{opacity:0;transform:translateY(0)}100.000%{opacity:0;transform:translateY(3px)}}
+@keyframes k16{0.000%{opacity:0;}54.286%{opacity:0;}55.714%{opacity:1;}90.000%{opacity:1;}92.857%{opacity:0;}100.000%{opacity:0;}}
+@keyframes k17{0.000%{transform:translate(600.0px,396.0px);opacity:0}55.000%{transform:translate(600.0px,396.0px);opacity:0}55.357%{transform:translate(600.0px,396.0px);opacity:1}59.643%{transform:translate(360.0px,396.0px);opacity:1}60.000%{transform:translate(360.0px,396.0px);opacity:0}100.000%{transform:translate(360.0px,396.0px);opacity:0}}
+@keyframes k18{0.000%{opacity:0;transform:translateY(3px)}59.286%{opacity:0;transform:translateY(3px)}61.071%{opacity:1;transform:translateY(0)}90.000%{opacity:1;transform:translateY(0)}92.857%{opacity:0;transform:translateY(0)}100.000%{opacity:0;transform:translateY(3px)}}
+@keyframes k19{0.000%{opacity:0;transform:translateY(4px)}64.286%{opacity:0;transform:translateY(4px)}66.429%{opacity:1;transform:translateY(0)}90.000%{opacity:1;transform:translateY(0)}92.857%{opacity:0;transform:translateY(0)}100.000%{opacity:0;transform:translateY(4px)}}</style><defs><marker id="ar-low" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--low)"/></marker><marker id="ar-mid" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--mid)"/></marker><marker id="ar-high" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--high)"/></marker><marker id="ar-brand" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--brand)"/></marker><marker id="ar-edge" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--edge)"/></marker></defs><rect width="960" height="520" rx="18" class="card"/><text x="40" y="46" class="h1">Círculo de Confianza: ¿de verdad es tu familiar?</text><text x="40" y="70" class="sub">Tu familiar entra al Círculo con una invitación. Si alguien dice ser él y pide plata, Desenmascara le pregunta.</text><line x1="120" y1="146" x2="120" y2="466" class="life"/><rect x="25.0" y="96" width="190" height="50" rx="10" class="box"/><text x="120" y="118" class="tb" text-anchor="middle">Estafador</text><text x="120" y="136" class="xs" text-anchor="middle">número desconocido</text><line x1="360" y1="146" x2="360" y2="466" class="life"/><rect x="265.0" y="96" width="190" height="50" rx="10" class="box"/><text x="360" y="118" class="tb" text-anchor="middle">Tú</text><text x="360" y="136" class="xs" text-anchor="middle">en Telegram</text><line x1="600" y1="146" x2="600" y2="466" class="life"/><rect x="505.0" y="96" width="190" height="50" rx="10" class="box"/><text x="600" y="118" class="tb" text-anchor="middle">Desenmascara</text><text x="600" y="136" class="xs" text-anchor="middle">bot</text><line x1="840" y1="146" x2="840" y2="466" class="life"/><rect x="745.0" y="96" width="190" height="50" rx="10" class="box"/><text x="840" y="118" class="tb" text-anchor="middle">Tu familiar</text><text x="840" y="136" class="xs" text-anchor="middle">en tu Círculo</text><path d="M126 186 H352" class="edge" marker-end="url(#ar-edge)" style="animation:k1 14.0s linear infinite"/><g style="opacity:0;animation:k2 14.0s linear infinite"><circle r="10" class="halo"/><circle r="5" class="pkt"/></g><g style="animation:k3 14.0s linear infinite"><text x="240.0" y="176" class="m" text-anchor="middle"><tspan class="m">«Mami, préstame plata, es urgente»</tspan></text></g><path d="M366 228 H592" class="edge" marker-end="url(#ar-edge)" style="animation:k4 14.0s linear infinite"/><g style="opacity:0;animation:k5 14.0s linear infinite"><circle r="10" class="halo"/><circle r="5" class="pkt"/></g><g style="animation:k6 14.0s linear infinite"><text x="480.0" y="218" class="m" text-anchor="middle"><tspan class="m">Reenvías el mensaje</tspan></text></g><path d="M594 270 H368" class="edge" marker-end="url(#ar-mid)" style="stroke:var(--mid);animation:k7 14.0s linear infinite"/><g style="opacity:0;animation:k8 14.0s linear infinite"><circle r="10" class="halo"/><circle r="5" class="pkt"/></g><g style="animation:k9 14.0s linear infinite"><text x="480.0" y="260" class="m" text-anchor="middle"><tspan class="b" style="fill:var(--mid)">SOSPECHOSO</tspan><tspan class="m"> · no transfieras aún</tspan></text></g><path d="M606 312 H832" class="edge" marker-end="url(#ar-edge)" style="animation:k10 14.0s linear infinite"/><g style="opacity:0;animation:k11 14.0s linear infinite"><circle r="10" class="halo"/><circle r="5" class="pkt"/></g><g style="animation:k12 14.0s linear infinite"><text x="720.0" y="302" class="m" text-anchor="middle"><tspan class="m">«¿Fuiste tú?» · Sí / No</tspan></text></g><path d="M834 354 H608" class="edge reply" marker-end="url(#ar-edge)" style="animation:k13 14.0s linear infinite"/><g style="opacity:0;animation:k14 14.0s linear infinite"><circle r="10" class="halo"/><circle r="5" class="pkt"/></g><g style="animation:k15 14.0s linear infinite"><text x="720.0" y="344" class="m" text-anchor="middle"><tspan class="m">«No fui yo»</tspan></text></g><path d="M594 396 H368" class="edge" marker-end="url(#ar-high)" style="stroke:var(--high);animation:k16 14.0s linear infinite"/><g style="opacity:0;animation:k17 14.0s linear infinite"><circle r="10" class="halo"/><circle r="5" class="pkt"/></g><g style="animation:k18 14.0s linear infinite"><text x="480.0" y="386" class="m" text-anchor="middle"><tspan class="b" style="fill:var(--high)">ES UNA ESTAFA</tspan><tspan class="m"> · no transfieras</tspan></text></g><g style="animation:k19 14.0s linear infinite"><rect x="575.0" y="420" width="290" height="30" rx="8" class="high-s"/><text x="720" y="440" class="m b" text-anchor="middle" style="fill:var(--high)">Y avisa al resto de tu Círculo</text></g><circle cx="49" cy="491" r="8" class="badge"/><text x="49" y="495" class="badge-n" text-anchor="middle">i</text><text x="64" y="495" class="s">Si tu familiar no responde en 5 minutos: «NO PUDIMOS CONFIRMARLO». No transfieras y llámalo a su número de siempre.</text></svg>
