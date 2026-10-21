@@ -98,6 +98,7 @@ def test_judge_scores_the_guide_examples():
 def test_judge_rules():
     call = judge(evidence("Me dijeron que les dictara el código", Psicologia("falso_asesor", "codigo_o_clave", False), tipo="llamada"))
     assert call.risk_score >= 85 and "Cuelga" in call.recommendations[-1]
+    assert not any("enlace" in r for r in call.recommendations)
 
     hit = BancoHit(tipo="llave", visible="315 ••• 0000", nivel=72, personas=11, reportes=12, modalidad="falsa_compra")
     purchase = judge(evidence("Consígname el anticipo", Psicologia("falsa_compra", "dinero", False), banco=[hit]))

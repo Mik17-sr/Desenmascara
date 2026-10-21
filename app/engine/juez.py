@@ -83,6 +83,7 @@ SUMMARY = {
     RiskLevel.INCONCLUSIVE: "No pudimos completar el análisis.",
 }
 REGLA_DE_ORO_LLAMADAS = "Cuelga y llama tú a la línea oficial que está en tu tarjeta."
+QUE_HACER_LLAMADA = "Cuelga y no dictes ningún código ni clave. Si ya lo diste, elige «Ya caí» y llama de inmediato a tu banco."
 BASE_LIMITATIONS = [
     "Análisis automático; puede equivocarse.",
     "Los enlaces no se abrieron: solo se revisó su nombre y su registro.",
@@ -248,7 +249,9 @@ def judge(e: Evidencia) -> AnalysisResult:
         category = f"Llamada: {category.lower()}"
 
     recommendations = []
-    if level in (RiskLevel.HIGH, RiskLevel.MEDIUM) and modalidad and MODALIDADES[modalidad][2]:
+    if e.tipo == "llamada" and level in (RiskLevel.HIGH, RiskLevel.MEDIUM):
+        recommendations.append(QUE_HACER_LLAMADA)  # the guide's case 3; the link advice makes no sense in a call
+    elif level in (RiskLevel.HIGH, RiskLevel.MEDIUM) and modalidad and MODALIDADES[modalidad][2]:
         recommendations.append(MODALIDADES[modalidad][2])
     if level in QUE_HACER and not (level == RiskLevel.HIGH and recommendations):
         recommendations.append(QUE_HACER[level])
