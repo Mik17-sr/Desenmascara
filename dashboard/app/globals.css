@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/* Neutral graphite with the brand's teal; no navy. Semáforo colors are reserved for risk
+   and always come with their word (guide, section 7). */
+:root {
+  --bg: #f4f6f5;
+  --surface: #ffffff;
+  --surface-2: #f1f4f3;
+  --ink: #131a18;
+  --muted: #5f6b68;
+  --line: #e2e8e6;
+  --brand: #0e9f8e;
+  --brand-ink: #0b7f72;
+  --brand-soft: #e3f5f2;
+  --sidebar: #0f1615;
+  --sidebar-ink: #e6eeec;
+  --sidebar-muted: #8b9c98;
+  --sidebar-line: #1f2a28;
+  --alert: #e8951c;
+  --risk-low: #1e8449;
+  --risk-mid: #d4a017;
+  --risk-mid-ink: #8a6d00;
+  --risk-high: #c0392b;
+  --risk-high-bg: #fdecea;
+  --risk-mid-bg: #fdf5dc;
+  --risk-low-bg: #e6f4ec;
+  --shadow: 0 1px 2px rgb(16 24 22 / 0.04), 0 2px 8px rgb(16 24 22 / 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b100f;
+    --surface: #121918;
+    --surface-2: #19221f;
+    --ink: #e9efee;
+    --muted: #94a3a0;
+    --line: #23302d;
+    --brand: #2bb5a3;
+    --brand-ink: #3cc9b6;
+    --brand-soft: #12312c;
+    --sidebar: #080c0b;
+    --sidebar-line: #18211f;
+    --risk-mid-ink: #e8c14a;
+    --risk-high: #e5544a;
+    --risk-high-bg: #351a19;
+    --risk-mid-bg: #322a14;
+    --risk-low-bg: #143222;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 2px 10px rgb(0 0 0 / 0.25);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-ink: var(--sidebar-ink);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-line: var(--sidebar-line);
+  --color-alert: var(--alert);
+  --color-risk-low: var(--risk-low);
+  --color-risk-mid: var(--risk-mid);
+  --color-risk-mid-ink: var(--risk-mid-ink);
+  --color-risk-high: var(--risk-high);
+  --color-risk-high-bg: var(--risk-high-bg);
+  --color-risk-mid-bg: var(--risk-mid-bg);
+  --color-risk-low-bg: var(--risk-low-bg);
+  --shadow-card: var(--shadow);
+  --font-sans: var(--font-inter), Arial, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, Consolas, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-inter), Arial, sans-serif;
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes slide-in { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes ping { 75%, 100% { transform: scale(2.2); opacity: 0; } }
+@keyframes pulse-alert {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(192 57 43 / 0.35); }
+  50% { box-shadow: 0 0 0 6px rgb(192 57 43 / 0); }
+}
+
+.rise { animation: rise 0.45s ease-out both; }
+.slide-in { animation: slide-in 0.4s ease-out both; }
+.toast-in { animation: toast-in 0.3s ease-out both; }
+.pulse-alert { animation: pulse-alert 2s ease-in-out infinite; }
+.live-dot::after {
+  content: ""; position: absolute; inset: 0; border-radius: 9999px; background: currentColor;
+  animation: ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 0.5rem;
+}
+.bar-grow { transition: width 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise, .slide-in, .toast-in, .pulse-alert, .skeleton, .live-dot::after { animation: none; }
+  .bar-grow { transition: none; }
+}
