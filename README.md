@@ -234,7 +234,7 @@ Esta versión implementa la guía del proyecto (`docs/`, v7.0) con tres cambios:
   | 5 · Archivista | `archivista.py` | Huellas MinHash para reconocer campañas aunque cambien palabras |
   | 6 · Juez | `juez.py` | Puntos y reglas de la sección 12; cada punto tiene una razón (Rayos X) |
 - **API** (`app/api/`): análisis público con límite por IP, endpoints del bot (`BOT_API_SECRET`), de las entidades (llave de acceso), del equipo (`ADMIN_API_KEY`) y vistas anónimas para el Dashboard.
-- **Dashboard** (`dashboard/`, Next.js): Radar en vivo con actividad y avisos, Verificar un mensaje con Rayos X, Banco de números y Panel de la entidad. Con Supabase se actualiza por Realtime; sin Supabase consulta cada 3 s.
+- **Dashboard** (`dashboard/`, Next.js): Radar en vivo con actividad, impacto y marcas suplantadas; Verificar un mensaje con Rayos X; Banco de números, con las herramientas del equipo (campañas y seguimiento de casos); Pitch, con el video de 3 minutos y sus capítulos; y Panel de la entidad. Modo claro y oscuro en todo el sitio. Con Supabase se actualiza por Realtime; sin Supabase consulta cada 3 s.
 
 ### Caso trazable, pregunta de confidencialidad y campañas del equipo
 
@@ -322,7 +322,7 @@ Para probar la migración sin Supabase: `TEST_DATABASE_URL=postgresql://... pyth
 ## 15. Pruebas y medición
 
 ```powershell
-python -m pytest                                   # 115 pruebas: motor, API de punta a punta, bot y Render (sin red ni IA real)
+python -m pytest                                   # 145 pruebas: motor, API de punta a punta, bot y Render (sin red ni IA real)
 python scripts/evaluar.py                          # mide contra la API en marcha con los 26 casos de prueba
 python scripts/evaluar.py datasets/casos_reales.csv  # y con los 23 mensajes reales del equipo
 ```
@@ -365,9 +365,9 @@ El modelo de 1B es más rápido, pero deja pasar 9 de las 14 estafas: nos quedam
 | Secretos | En `.env` (ignorado por git), generados por `setup_local.py`. gitleaks revisa todo el historial en cada cambio (`.github/workflows/pruebas.yml`). |
 | Acceso a datos | RLS en las 14 tablas de Supabase y permisos revocados a `anon`/`authenticated`; el Dashboard solo lee agregados anónimos; entidades con correo y contraseña (scrypt, con límite de intentos) y sesión firmada; la llave de integración se guarda como hash. |
 | Cifrado | Teléfonos, llaves e ids de Telegram como HMAC-SHA256; códigos y chats cifrados (Fernet). En Render todo va por HTTPS, y la conexión con Supabase va cifrada (TLS). |
-| Datos personales | Se borran nombres, números y cuentas antes de guardar; audios en memoria; `/borrar` elimina a la persona. |
+| Datos personales | Se borran nombres (también los que la lectura de capturas pega en mayúsculas y los que van tras un saludo o un título), números y cuentas antes de guardar; audios en memoria; `/borrar` elimina a la persona. `scripts/reanonimizar.py` limpia lo ya guardado cuando el anonimizador aprende algo nuevo. |
 | Envenenamiento | Un voto por persona y valor, reportes viejos a la mitad, revisión por el dueño. |
-| Círculo | El familiar se valida: comparte con Telegram el mismo número que dio el protegido y el protegido confirma que es él; el enlace dura 48 horas y sirve una vez; un número distinto no entra y el protegido recibe la alerta. Salida con un mensaje. |
+| Círculo | El familiar se valida: comparte con Telegram el mismo número que dio el protegido, responde la pregunta de confidencialidad si la hay (cifrada; la respuesta solo como huella; 3 intentos) y el protegido confirma que es él; el enlace dura 48 horas y sirve una vez; un número distinto o tres respuestas equivocadas no entran y el protegido recibe la alerta. Salida con un mensaje. |
 | Llamada Verificada | Solo responde a la persona llamada (su propio contacto de Telegram); código de un uso que se borra a los 15 minutos. |
 | Archivos | Tipo real por sus bytes, límites de tamaño y proceso en memoria. |
 | Dependencias | pip-audit y npm audit en cada cambio: hoy, 0 vulnerabilidades conocidas (FastAPI sobre starlette 1.x; PostCSS corregido dentro de Next). |
@@ -376,9 +376,9 @@ El modelo de 1B es más rápido, pero deja pasar 9 de las 14 estafas: nos quedam
 
 ## 17. Qué funciona y qué falta
 
-Funciona y está publicado en Render (sección 18): el bot con mensajes, capturas, números y notas de voz; Llamada Verificada con las entidades conectadas (hoy, «Desenmascara», para probar); Círculo de Confianza con invitaciones validadas (el familiar comparte el mismo número que dio el protegido, y el protegido confirma que es él; el enlace dura 48 horas y sirve una vez); Banco de números con lista blanca y revisiones; Antes de pagar; el Dashboard con sus 4 vistas.
+Funciona y está publicado en Render (sección 18): el bot con mensajes, capturas, números y notas de voz; Llamada Verificada con las entidades conectadas (hoy, «Desenmascara», para probar); Círculo de Confianza con invitaciones validadas (el número del familiar, una pregunta de confidencialidad y la confirmación del protegido); registro trazable de cada caso (`/caso`); campañas identificadas por el equipo que se vuelven reglas, y el aviso de las modalidades que se popularizan; Banco de números con lista blanca y revisiones; Antes de pagar; la app de Android que avisa antes de contestar (sección 19); el Dashboard con sus 5 vistas, entre ellas el Pitch en video.
 
-Falta o es visión: WhatsApp (Twilio); los 4 casos reales del equipo y el dataset real; escaneos de seguridad en CI; entidades reales conectadas. El despliegue en Render ya está listo en `render.yaml` (sección 18).
+Falta o es visión: WhatsApp (Twilio); el dataset completo que pide la guía (hoy hay 23 mensajes reales; faltan los 100 mensajes, 20 llamadas y 20 compras); entidades reales conectadas. Las pruebas y los escaneos de seguridad ya corren en cada cambio (`.github/workflows/pruebas.yml`), y el despliegue en Render está listo en `render.yaml` (sección 18).
 
 ---
 
@@ -465,6 +465,10 @@ El repositorio es público, así que Render lo encuentra pegando la URL `https:/
 | El Dashboard | Abrir `https://desenmascara.onrender.com` |
 | El Panel de la entidad | Con un acceso propio: `python scripts/crear_acceso.py "Desenmascara" --correo su@correo.com` le crea uno y muestra su contraseña una vez |
 | Llamada Verificada | Desde el Panel, registrar una llamada al número de un compañero; él pregunta al bot (opción 2 → botón **📞 Desenmascara**) y ve **SÍ, ES REAL** con el código |
+| El Círculo con pregunta | En el bot, opción 4 → **Agregar familiar**: el nombre, el número y una pregunta que solo esa persona sepa responder. El compañero abre el enlace, comparte su número y responde |
+| El seguimiento de un caso | Enviarle al bot un mensaje sospechoso y escribir `/caso` (o tocar **Seguimiento del caso**) |
+| Las campañas del equipo | En el Banco de números, **Acceso del equipo** con la llave de moderación (`ADMIN_API_KEY`): identificar, describir y volver regla una campaña |
+| El pitch | Abrir `https://desenmascara.onrender.com/pitch`: el video de 3 minutos con capítulos |
 | La app de Android | Sección 19 |
 
 El repositorio solo hace falta para cambiar el código (sección 13). Cada persona usa su propio `.env`: las llaves no están en GitHub. Mientras el bot esté publicado en Render, no se arranca otro en un computador (el programa se niega solo, para no quitárselo al servidor).
@@ -477,7 +481,8 @@ El repositorio solo hace falta para cambiar el código (sección 13). Cada perso
 | La API no arranca: «En Render falta DATABASE_URL» | Falta la variable: con SQLite los datos se borrarían en cada reinicio | Agrégala y vuelve a desplegar |
 | El Dashboard dice «La API respondió 404» | `NEXT_PUBLIC_API_URL` quedó vacía al construirlo | Ponla y **Clear build cache & deploy** |
 | El Dashboard no carga datos y la API no ve sus consultas | `DASHBOARD_ORIGINS` no es la dirección real del Dashboard | Copia la que muestra Render (puede no ser `desenmascara-dashboard…`) |
-| Un cambio subido a GitHub no aparece | Con la URL pública Render no despliega solo | **Manual Deploy → Deploy latest commit** |
+| Un cambio subido a GitHub no aparece | Con la URL pública Render no despliega solo | **Manual Deploy → Deploy latest commit** (la API) y **Clear build cache & deploy** (el Dashboard) |
+| La API no arranca: «Faltan tablas o columnas en la base de datos» | La versión nueva trae columnas que Supabase aún no tiene | Ejecuta en el SQL Editor la migración que falta de `supabase/migrations/` (en orden) y vuelve a desplegar |
 | El bot tardó un minuto | El servicio gratis se había dormido | Normal; Telegram reintenta y el mensaje llega |
 
 **Qué esperar del plan gratis**
