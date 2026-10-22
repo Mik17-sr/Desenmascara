@@ -9,7 +9,7 @@ import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.engine import archivista, enlaces, pistas as pistas_mod
+from app.engine import archivista, enlaces, oficiales, pistas as pistas_mod
 from app.engine.analyzer import INJECTION_PATTERN, MAX_MODEL_CHARS, classify
 from app.engine.juez import Evidencia, judge
 from app.schemas.contract import AnalysisInput, AnalysisResult
@@ -22,7 +22,10 @@ async def _no_ai():
 
 async def analyze(session: AsyncSession, payload: AnalysisInput) -> tuple[AnalysisResult, list[int] | None, pistas_mod.Pistas]:
     started = time.perf_counter()
-    official = await entidades.official_domains(session)
+    # Real entities' websites from the dataset, plus those of the entities connected to Llamada Verificada.
+    official: dict[str, list[str]] = {name: list(sites) for name, sites in oficiales.official_websites().items()}
+    for name, domain in (await entidades.official_domains(session)).items():
+        official.setdefault(name, []).append(domain)
     known = [e.nombre for e in await entidades.active(session)]
     found = pistas_mod.extract(payload.text, known)
     urls = list(dict.fromkeys(found.urls + pistas_mod.extract_urls(" ".join(payload.links))))[:5]

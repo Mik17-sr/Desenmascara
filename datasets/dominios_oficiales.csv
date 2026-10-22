@@ -1,0 +1,28 @@
+entidad,tipo,dominio,comprobado,nota
+Bancolombia,banco,bancolombia.com,2026-10-21,sitio principal
+Bancolombia,banco,transaccionesbancolombia.com,2026-10-21,sucursal virtual; enlazado desde bancolombia.com
+Nequi,banco,nequi.com.co,2026-10-21,sitio principal
+Davivienda,banco,davivienda.com,2026-10-21,sitio principal
+Daviplata,banco,daviplata.com,2026-10-21,sitio principal
+Davibank,banco,davibank.com,2026-10-21,antes Scotiabank Colpatria
+Scotiabank Colpatria,banco,scotiabankcolpatria.com,2026-10-21,redirige a davibank.com
+Scotiabank Colpatria,banco,davibank.com,2026-10-21,nuevo nombre: Davibank
+BBVA,banco,bbva.com.co,2026-10-21,sitio principal
+Banco de Bogotá,banco,bancodebogota.com,2026-10-21,sitio principal
+Banco Popular,banco,bancopopular.com.co,2026-10-21,sitio principal
+Banco de Occidente,banco,bancodeoccidente.com.co,2026-10-21,sitio principal
+AV Villas,banco,avvillas.com.co,2026-10-21,sitio principal
+Banco Caja Social,banco,bancocajasocial.com,2026-10-21,sitio principal
+Banco Agrario,banco,bancoagrario.gov.co,2026-10-21,sitio principal
+Itaú,banco,itau.co,2026-10-21,sitio principal
+Banco Falabella,banco,bancofalabella.com.co,2026-10-21,sitio principal
+Lulo Bank,banco,lulobank.com,2026-10-21,sitio principal
+DIAN,publica,dian.gov.co,2026-10-21,sitio principal
+Policía,publica,policia.gov.co,2026-10-21,sitio principal
+Fiscalía,publica,fiscalia.gov.co,2026-10-21,sitio principal
+Registraduría,publica,registraduria.gov.co,2026-10-21,sitio principal
+SIMIT,publica,fcm.org.co,2026-10-21,Federación Colombiana de Municipios
+Servientrega,mensajeria,servientrega.com,2026-10-21,sitio principal
+Interrapidisimo,mensajeria,interrapidisimo.com,2026-10-21,sitio principal
+Coordinadora,mensajeria,coordinadora.com,2026-10-21,sitio principal
+Mercado Libre,tienda,mercadolibre.com.co,2026-10-21,sitio principal

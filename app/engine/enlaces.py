@@ -8,6 +8,7 @@ in Google Safe Browsing and URLhaus, again on fixed hosts.
 import asyncio
 import re
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
@@ -65,24 +66,26 @@ def levenshtein(a: str, b: str) -> int:
     return previous[-1]
 
 
-def check_link(url: str, official_domains: dict[str, str], claimed: list[str]) -> LinkCheck:
-    """official_domains maps entity name -> official domain; claimed are the names the message uses."""
+def _looks_alike(label: str, brand: str) -> bool:
+    if len(brand) < 5:  # "dian", "bbva", "itau": only as a whole word or at the start, so meridian.com is not the DIAN
+        words = re.split(r"[-_]", label)
+        return label.startswith(brand) or _skeleton(brand) in {_skeleton(w) for w in words}
+    return brand in label or _skeleton(brand) in _skeleton(label) or levenshtein(_skeleton(label), _skeleton(brand)) <= 2
+
+
+def check_link(url: str, official_domains: Mapping[str, str | Sequence[str]], claimed: list[str]) -> LinkCheck:
+    """official_domains maps entity name -> its official domain or domains; claimed are the names the message uses."""
     host = urlsplit(url).hostname or ""
     domain = registered_domain(host)
     check = LinkCheck(url=url, dominio=domain, punycode=any(p.startswith("xn--") for p in host.split(".")))
-    for name, official in official_domains.items():
-        if domain == official:
+    sites = [(name, site) for name, value in official_domains.items() for site in ([value] if isinstance(value, str) else value)]
+    for name, site in sites:
+        if domain == site:
             check.oficial_de = name
             return check
     label = domain.split(".")[0]
-    for name, official in official_domains.items():
-        brand = official.split(".")[0]
-        looks_alike = brand in label or _skeleton(brand) in _skeleton(label)
-        if len(brand) >= 5 and levenshtein(_skeleton(label), _skeleton(brand)) <= 2:
-            looks_alike = True
-        if looks_alike or check.punycode or name in claimed:
-            check.imita_a = name
-            break
+    check.imita_a = (next((name for name, site in sites if _looks_alike(label, site.split(".")[0])), None)
+                     or next((name for name in claimed if name in official_domains), None))
     return check
 
 

@@ -23,13 +23,13 @@ AMOUNT_PATTERN = re.compile(r"\$\s?\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{2})?|\$\s?\d+"
 # 4-8 digits that are not part of an amount such as 45.200 (a final period is fine).
 CODE_PATTERN = re.compile(r"(?<![\d$])(?<!\d[.,])\b\d{4,8}\b(?!\d|[.,]\d)")
 
-# Detection only: whether a message claims to come from one of these. Official domains and
-# numbers come from the entidades table, never from this list.
+# Detection only: whether a message claims to come from one of these. Official websites come from
+# datasets/dominios_oficiales.csv and the entidades table; official numbers only from the entidades table.
 KNOWN_NAMES = [
     "Bancolombia", "Davivienda", "BBVA", "Banco de Bogotá", "Banco Popular", "Banco de Occidente",
-    "Banco Caja Social", "Scotiabank Colpatria", "Banco Agrario", "AV Villas", "Itaú", "Nequi",
-    "Daviplata", "Banco Falabella", "Lulo Bank", "DIAN", "Policía", "Fiscalía", "Secretaría de Movilidad",
-    "SIMIT", "Servientrega", "Interrapidisimo",
+    "Banco Caja Social", "Scotiabank Colpatria", "Davibank", "Banco Agrario", "AV Villas", "Itaú", "Nequi",
+    "Daviplata", "Banco Falabella", "Lulo Bank", "DIAN", "Policía", "Fiscalía", "Registraduría",
+    "Secretaría de Movilidad", "SIMIT", "Servientrega", "Interrapidisimo", "Coordinadora", "Mercado Libre",
 ]
 # "Tu código es 482913. No lo compartas": a notice that hands over a code, which small models
 # read as a request for it. Only counts when the message asks for nothing back.
