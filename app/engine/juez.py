@@ -281,8 +281,11 @@ def judge(e: Evidencia) -> AnalysisResult:
         score = max(score, 70)  # rule: hidden orders for the AI, or a number the community marked red
     if patron in PATRON_ALTO:
         score = max(score, 75)  # rule: a pattern of real scams: account theft, fake fine, easy-money job, phishing
-    if patron == "falso_familiar":
-        score = max(score, 45)  # rule: the false relative is "sospechoso" until the Círculo confirms it
+    if patron == "falso_familiar" or modalidad == "falso_familiar":
+        # The team's rule: "sospechoso" while it only says "new number" (the Círculo can confirm it), high risk as soon
+        # as it asks for money, a transfer or a code.
+        asks_money = e.pistas.pide_dinero or (p is not None and p.pide in ("dinero", "mover_dinero", "codigo_o_clave"))
+        score = max(score, 75 if asks_money else 45)
     if cobro:
         score = max(score, 40)  # rule: an unrequested collection with threats or discounts is verified before paying
     if aviso_de_codigo and not banco_alto and not e.inyeccion:

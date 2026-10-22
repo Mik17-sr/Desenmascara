@@ -101,5 +101,5 @@ AYUDA = join(
     esc("No abras enlaces por precaución y quita del mensaje los datos personales que no hagan falta."),
 )
 NO_SOPORTADO = esc("Por ahora reviso mensajes, capturas, números y notas de voz.")
-SIN_RESPUESTA_API = esc("No pude obtener el análisis en este momento. Inténtalo de nuevo más tarde.")
+SIN_RESPUESTA_API = esc("No pude conectarme con Desenmascara en este momento. Inténtalo de nuevo en un minuto.")
 DEMASIADO_RAPIDO = esc("Vas muy rápido: espera un minuto y vuelve a intentarlo.")

@@ -7,6 +7,7 @@ The bot only talks to people and to the API. It keeps short-lived state in memor
 import logging
 import re
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 
 from telegram import (
     InlineKeyboardButton as Btn,
@@ -23,10 +24,13 @@ from telegram.ext import ContextTypes
 from app.bot import textos
 from app.bot.api import IMAGE_TIMEOUT, VOICE_TIMEOUT, Api, ApiError
 from app.bot.formatters import (
-    SEMAFORO, b, esc, format_analysis, format_call, format_code, format_heard, format_not_connected, format_number, format_report, join,
+    SEMAFORO, b, esc, format_analysis, format_call, format_code, format_heard, format_not_connected, format_number, format_report, header,
+    join,
 )
 from app.core.security import normalize_phone
-from app.engine.pistas import extract, plain
+from app.engine.enlaces import registered_domain
+from app.engine.oficiales import official_websites
+from app.engine.pistas import CHAT_LINKS, SHORTENERS, extract, plain
 from app.schemas.contract import AnalysisResult
 
 logger = logging.getLogger(__name__)
@@ -260,6 +264,13 @@ async def _analyze_text(update: Update, context: ContextTypes.DEFAULT_TYPE, text
 def _remember(context: ContextTypes.DEFAULT_TYPE, result: AnalysisResult, text: str) -> list[tuple[str, str]]:
     found = extract(text)
     reportables = [("telefono", v) for v in found.telefonos] + [("llave", v) for v in found.llaves] + [("cuenta", v) for v in found.cuentas]
+    # Links too, by their domain, but never a shortener, a chat link or an official site: that would brand a real service.
+    official = {site for sites in official_websites().values() for site in sites}
+    for url in found.urls:
+        host = (urlsplit(url).hostname or "").removeprefix("www.")
+        domain = registered_domain(host)
+        if host not in SHORTENERS | CHAT_LINKS and domain not in official and ("enlace", domain) not in reportables:
+            reportables.append(("enlace", domain))
     context.user_data["reportables"] = reportables[:5]
     context.user_data["reportar_modalidad"] = result.modalidad
     context.user_data["ultima_verificacion"] = result.verification_id
@@ -276,7 +287,7 @@ async def _deliver(update: Update, context: ContextTypes.DEFAULT_TYPE, out: dict
     reportables = _remember(context, result, text)
     questions = out.get("preguntas_circulo") or []
     if questions:
-        await _ask_circle(update, context, questions, text)
+        await _ask_circle(update, context, questions, text, result)
         return
     message = format_analysis(result)
     if heard:
@@ -301,13 +312,14 @@ async def _deliver(update: Update, context: ContextTypes.DEFAULT_TYPE, out: dict
 
 # --- Círculo de Confianza ------------------------------------------------------------------
 
-async def _ask_circle(update: Update, context: ContextTypes.DEFAULT_TYPE, questions: list[dict], text: str) -> None:
+async def _ask_circle(update: Update, context: ContextTypes.DEFAULT_TYPE, questions: list[dict], text: str,
+                      result: AnalysisResult | None = None) -> None:
     names = sorted({q["nombre"] for q in questions})
     words = set(re.findall(r"\w+", plain(text)))
     mentioned = [n for n in names if plain(n).split()[0] in words]
     who = ", ".join(names)
     await _reply(update, join(
-        f"🟡 {b('SOSPECHOSO')}",
+        header(result.risk_level.value, result.risk_score, result.category) if result else f"🟡 {b('SOSPECHOSO')}",
         (f"{esc('Dice ser')} {b(mentioned[0])}{esc(', que está en tu Círculo.')}" if mentioned
          else esc("Tiene el patrón del falso familiar: alguien que dice ser de tu familia y pide dinero.")),
         esc(f"Le estoy preguntando a {who} en su Telegram."),

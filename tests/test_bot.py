@@ -96,6 +96,21 @@ def test_a_published_line_tells_where_to_call_but_not_that_a_call_is_real():
     assert "01 8000 9 12345" in call
 
 
+def test_links_can_be_reported_but_never_a_shortener_a_chat_or_an_official_site():
+    context = SimpleNamespace(user_data={})
+    text = "Paga hoy en https://bit.ly/x o en .cuctly.cc/pago, escríbenos a wa.me/573001112233 o mira bancolombia.com"
+    reportables = handlers._remember(context, result("high", 80), text)
+    assert ("enlace", "cuctly.cc") in reportables
+    assert not any(valor in ("bit.ly", "wa.me", "bancolombia.com") for _, valor in reportables)
+
+
+def test_the_same_reason_is_said_once():
+    twice = SignalItem(code="DOMINIO_NO_REGISTRADO", label="El enlace lleva a una página que no aparece registrada.",
+                       evidence="a.co", source=SignalSource.ENLACES, points=15)
+    message = format_analysis(result(signals=[twice, twice.model_copy(update={"evidence": "b.co"})]))
+    assert message.count("no aparece registrada") == 1
+
+
 def test_verified_call_code_is_in_a_box():
     assert "`4 8 2 1`" in format_call({"estado": "real", "entidad": "BancoAndino", "motivo": "Confirmar una compra.", "codigo": "4821"})
 

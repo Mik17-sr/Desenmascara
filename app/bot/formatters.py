@@ -56,7 +56,7 @@ def format_analysis(result: AnalysisResult) -> str:
     level = result.risk_level.value
     category = result.category or (result.summary if level in ("low", "inconclusive") else None)
     lines = [header(level, result.risk_score, category)]
-    reasons = [s for s in result.signals if s.points > 0][:MAX_SIGNALS]
+    reasons = list({s.label: s for s in result.signals if s.points > 0}.values())[:MAX_SIGNALS]
     if level == "low":
         reasons = [s for s in result.signals if s.points <= 0][:1]
     if reasons:

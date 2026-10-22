@@ -177,7 +177,7 @@ def test_circulo_de_confianza(client):
     with fake_ai("falso_familiar", "dinero", True):
         out = client.post("/api/v1/bot/analizar", headers=BOT, json=mama | {
             "texto": "Hola ma, soy Juan. Se me dañó el celular y este es mi número nuevo. Necesito $800.000 urgente"}).json()
-    assert out["resultado"]["risk_level"] == "medium"
+    assert out["resultado"]["risk_level"] == "high"  # it asks for money; the Círculo is asked all the same
     question = out["preguntas_circulo"][0]
     assert question["chat_id"] == 5010 and question["nombre"] == "Juan"
 

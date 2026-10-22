@@ -72,6 +72,9 @@ PATRONES = {
 FAMILY_WORDS = {"ma", "mami", "mama", "mamita", "pa", "papi", "papa", "papito", "abuela", "abuelo", "abue", "hijo", "hija",
                 "tia", "tio", "hermano", "hermana", "primo", "prima", "suegra", "suegro"}
 FAMILY_SQUASHED = ("mama", "mami", "papa", "papi", "abuel", "hermano", "hermana")
+# Asking for money, as a false relative does once trust is won ("préstame", "mándame plata", "transfiéreme").
+MONEY_ASK = ("transfier", "transferen", "consign", "prestame", "presteme", "mandame", "enviame", "necesitoplata",
+             "necesitodinero", "plata", "nequi", "daviplata", "llavebreb", "girame", "pagame")
 # Link shorteners hide where a link goes.
 SHORTENERS = {"bit.ly", "bitly.com", "wa.link", "ma.sv", "tinyurl.com", "cutt.ly", "t.ly", "is.gd", "rebrand.ly",
               "shorturl.at", "acortar.link", "rb.gy", "tiny.cc", "ow.ly", "s.id"}
@@ -108,6 +111,7 @@ class Pistas:
     acortados: list[str] = field(default_factory=list)
     enlace_disfrazado: bool = False
     menciona_familia: bool = False
+    pide_dinero: bool = False
     # A way to pay or talk that came inside the message: a shortened or disguised link, a chat link or a payment reference.
     canal_del_mensaje: bool = False
 
@@ -182,6 +186,7 @@ def extract(text: str, entity_names: list[str] | None = None) -> Pistas:
         acortados=[h for h in hosts if h in SHORTENERS],
         enlace_disfrazado=bool(disguised),
         menciona_familia=bool(FAMILY_WORDS & set(re.findall(r"\w+", lowered))) or any(w in squashed for w in FAMILY_SQUASHED),
+        pide_dinero=bool(llaves or cuentas) or any(w in squashed for w in MONEY_ASK),
         canal_del_mensaje=(bool(disguised) or "pago_referencia" in patrones or bool(phones) or any(h in SHORTENERS | CHAT_LINKS for h in hosts)
                            or any(w in squashed for w in CONTACT_WORDS)),
     )

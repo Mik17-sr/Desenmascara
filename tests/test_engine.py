@@ -174,8 +174,11 @@ def test_judge_scores_the_guide_examples():
     assert phishing.risk_level == RiskLevel.HIGH and phishing.risk_score >= 85
     assert phishing.signals[0].points == 30  # the Rayos X start with the link
 
+    # The guide's case 2, with the team's rule: "sospechoso" while it only says "new number", high once it asks for money.
+    new_number = judge(evidence("Mamá, se me dañó el celular, este es mi número nuevo. ¿Estás ocupada?", Psicologia("falso_familiar", "nada", False)))
+    assert new_number.risk_level == RiskLevel.MEDIUM
     familiar = judge(evidence("Hola ma, cambié de número. Necesito una transferencia urgente", Psicologia("falso_familiar", "dinero", True)))
-    assert familiar.risk_level == RiskLevel.MEDIUM  # the guide's case 2: SOSPECHOSO
+    assert familiar.risk_level == RiskLevel.HIGH
 
     legit = judge(evidence("Tu pedido #48213 llegará mañana entre 8:00 a. m. y 12:00 m.", Psicologia("ninguna", "nada", False)))
     assert legit.risk_level == RiskLevel.LOW
@@ -215,9 +218,11 @@ def test_code_notices_are_not_requests():
     assert not extract("Te enviamos un código de 6 dígitos por error, ¿me lo reenvías?").aviso_de_codigo
 
 
-def test_known_pattern_asking_for_money_is_high_but_false_relative_stays_suspicious():
+def test_known_pattern_asking_for_money_is_high_and_so_is_a_false_relative_who_asks_for_it():
     assert judge(evidence("Vendo moto, consigna el anticipo hoy", Psicologia("falsa_compra", "dinero", False))).risk_level == RiskLevel.HIGH
-    assert judge(evidence("Ma, cambié de número, mándame plata", Psicologia("falso_familiar", "dinero", True))).risk_level == RiskLevel.MEDIUM
+    assert judge(evidence("Ma, cambié de número, mándame plata", Psicologia("falso_familiar", "dinero", True))).risk_level == RiskLevel.HIGH
+    # Without the AI, the words alone ("mándame plata") are enough.
+    assert judge(evidence("Mamá, este es mi número nuevo. Mándame plata, es urgente", None, ia_consultada=False)).risk_level == RiskLevel.HIGH
 
 
 def test_without_ai_weak_clues_are_inconclusive():
