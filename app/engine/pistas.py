@@ -34,11 +34,49 @@ KNOWN_NAMES = [
 # "Tu código es 482913. No lo compartas": a notice that hands over a code, which small models
 # read as a request for it. Only counts when the message asks for nothing back.
 CODE_WARNING = re.compile(r"no\s+(?:lo|la)\s+compartas|no\s+compartas|nunca\s+te\s+(?:lo|la)\s+pedir|si\s+no\s+(?:lo|la)\s+(?:solicitaste|pediste)|si\s+no\s+fuiste\s+tu")
+# "489370 es tu código de verificación para U Distrital App": it hands over a code without warning.
+CODE_DELIVERY = re.compile(r"\b(?:es\s+tu|es\s+su|tu|su)\s+codigo\b|\bcodigo\s+de\s+(?:verificacion|seguridad|acceso|confirmacion)\b")
 ASKS_BACK = re.compile(r"envi|reenvi|dime|digame|dicta|dictame|compart(?:e|eme|ir)\b|respond|escribe|escribeme|manda|llama\s+al|ingresa|entra\s+a")
 URGENCY_WORDS = [
-    "urgente", "inmediat", "hoy mismo", "solo hoy", "ultimo aviso", "bloque", "suspend", "24 horas",
-    "48 horas", "embargo", "multa", "no le digas", "no le diga", "antes de que", "ultima oportunidad",
+    "urgente", "inmediat", "hoy mismo", "solo hoy", "solo por hoy", "ultimo aviso", "bloque", "suspend", "24 horas",
+    "48 horas", "embargo", "multa", "decomiso", "cobro juridico", "no le digas", "no le diga", "antes de que",
+    "ultima oportunidad", "se eliminara", "pronta respuesta",
 ]
+
+# Patterns of real Colombian scams (datasets/casos_reales.csv), matched on the text without spaces or
+# accents because screenshots often lose the spaces in OCR ("esteesminumeronuevo"). A pattern needs one
+# word of each of its groups.
+PATRONES = {
+    "falso_familiar": (("mama", "mami", "papa", "papi", "abuel", "hijo", "hija", "mamita"),
+                       ("numeronuevo", "nuevonumero", "cambiedenumero", "esteesminumero", "otronumeroyano", "semehaestropeado",
+                        "semedanoelcelular", "semerobaronelcelular")),
+    "robo_de_cuenta": (("soportetecnicodewhatsapp", "soportedewhatsapp", "equipodewhatsapp", "whatsappsupport",
+                        "soportedetelegram", "soportedefacebook", "soportedeinstagram"),),
+    "falsa_multa": (("sancionvial", "comparendo", "fotomulta", "infractor", "multadetransito"),
+                    ("descuento", "descto", "dto", "embargo", "decomiso", "cobrojuridico", "ingresa", "paga", "cancela")),
+    "falso_empleo": (("generadinero", "ganadinero", "ganahasta", "ingresosextra", "trabajodesdecasa", "ganadiario"),),
+    "phishing": (("verifyyouraccount", "verifyaccount", "confirmyouridentity", "logintoyouraccount", "updateyourpayment"),
+                 ("suspiciousactivity", "beenlocked", "beensuspended", "unauthorized", "unusualactivity")),
+    # Not a scam by itself: real collections use them too, so these only add points.
+    "amenaza_cobro": (("cobrojuridico", "embargo", "decomiso", "procesojuridico", "instanciadecobro", "centralesderiesgo",
+                       "reportenegativo", "reconex", "cortedelservicio", "suspensiondelservicio"),
+                      ("descuento", "descto", "dto", "paga", "cancela", "cancele", "aproveche", "evita", "evite", "pagooportuno")),
+    "cobro_de_deuda": (("deuda", "obligacion", "mora", "historialcrediticio", "imagencrediticia", "imagencomercial", "datacredito",
+                        "saldopendiente", "efecty", "baloto"),
+                       ("descuento", "descto", "desct", "dto", "pagasolo", "pazysalvo", "facilidades", "condonacion", "liberarte",
+                        "pagooportuno", "rebaja")),
+    "pago_referencia": (("efecty", "baloto", "superpagos", "pagatodo", "convenio", "conv1", "conv2", "conv3", "conv4", "conv5",
+                         "conv6", "conv7", "conv8", "conv9"),),
+}
+# Family words: a "false relative" needs one. As whole words ("Hola ma") or inside OCR text without spaces.
+FAMILY_WORDS = {"ma", "mami", "mama", "mamita", "pa", "papi", "papa", "papito", "abuela", "abuelo", "abue", "hijo", "hija",
+                "tia", "tio", "hermano", "hermana", "primo", "prima", "suegra", "suegro"}
+FAMILY_SQUASHED = ("mama", "mami", "papa", "papi", "abuel", "hermano", "hermana")
+# Link shorteners hide where a link goes.
+SHORTENERS = {"bit.ly", "bitly.com", "wa.link", "ma.sv", "tinyurl.com", "cutt.ly", "t.ly", "is.gd", "rebrand.ly",
+              "shorturl.at", "acortar.link", "rb.gy", "tiny.cc", "ow.ly", "s.id"}
+# ".col.cuctly.cc/": a domain written with a leading dot so that filters do not turn it into a link.
+DISGUISED_LINK = re.compile(r"(?i)(?<![\w/.:@-])\.([a-z0-9-]+(?:\.[a-z0-9-]+)+)/?")
 
 
 def plain(text: str) -> str:
@@ -63,6 +101,19 @@ class Pistas:
     entidades: list[str] = field(default_factory=list)
     urgencia: list[str] = field(default_factory=list)
     aviso_de_codigo: bool = False
+    patrones: list[str] = field(default_factory=list)
+    acortados: list[str] = field(default_factory=list)
+    enlace_disfrazado: bool = False
+    menciona_familia: bool = False
+
+
+def squash(text: str) -> str:
+    """Lowercase, no accents, only letters and digits: 'Número nuevo' and 'numeronuevo' read the same."""
+    return re.sub(r"[^a-z0-9]", "", plain(text))
+
+
+def find_patterns(squashed: str) -> list[str]:
+    return [name for name, groups in PATRONES.items() if all(any(word in squashed for word in group) for group in groups)]
 
 
 def extract_urls(text: str) -> list[str]:
@@ -102,11 +153,14 @@ def extract(text: str, entity_names: list[str] | None = None) -> Pistas:
         value = match.group(1).strip()
         llaves.append(re.sub(r"\s", "", value) if value[0].isdigit() else value.lower())
     cuentas = [re.sub(r"\D", "", m.group(1)) for m in CUENTA_PATTERN.finditer(text)]
-    lowered = plain(text)
-    urls = extract_urls(text)
+    lowered = plain(text).replace("sin embargo", "sin_embargo")  # "however", not a seizure
+    squashed = squash(text).replace("sinembargo", "")
+    disguised = [f"https://{m.group(1).lower()}" for m in DISGUISED_LINK.finditer(text)]
+    urls = list(dict.fromkeys(extract_urls(text) + disguised))
     codigos = CODE_PATTERN.findall(AMOUNT_PATTERN.sub(" ", without_phones))
     # The warning itself contains "compartas", so it is removed before looking for requests.
     asks_back = ASKS_BACK.search(CODE_WARNING.sub(" ", lowered))
+    hosts = [(urlsplit(u).hostname or "").removeprefix("www.") for u in urls]
     return Pistas(
         urls=urls,
         telefonos=list(dict.fromkeys(phones)),
@@ -115,6 +169,11 @@ def extract(text: str, entity_names: list[str] | None = None) -> Pistas:
         montos=AMOUNT_PATTERN.findall(text),
         codigos=codigos,
         entidades=_find_names(text, (entity_names or []) + KNOWN_NAMES),
-        urgencia=[w for w in URGENCY_WORDS if w in lowered],
-        aviso_de_codigo=bool(codigos) and bool(CODE_WARNING.search(lowered)) and not asks_back and not urls,
+        urgencia=[w for w in URGENCY_WORDS if w in lowered or w.replace(" ", "") in squashed],
+        aviso_de_codigo=(bool(codigos) and bool(CODE_WARNING.search(lowered) or CODE_DELIVERY.search(lowered))
+                         and not asks_back and not urls),
+        patrones=find_patterns(squashed),
+        acortados=[h for h in hosts if h in SHORTENERS],
+        enlace_disfrazado=bool(disguised),
+        menciona_familia=bool(FAMILY_WORDS & set(re.findall(r"\w+", lowered))) or any(w in squashed for w in FAMILY_SQUASHED),
     )

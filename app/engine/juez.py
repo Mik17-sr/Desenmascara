@@ -33,7 +33,20 @@ P_INYECCION = 20
 P_CAMPANA_MAX = 20
 P_BANCO_MAX = 25
 P_AVISO_CODIGO = -40
-P_PIDE = {"codigo_o_clave": 35, "instalar_app": 30, "mover_dinero": 30, "dinero": 20, "datos_personales": 20, "abrir_enlace": 10}
+P_DISFRAZADO = 20
+P_ACORTADO = 10
+P_AMENAZA = 20
+P_PAGO_REFERENCIA = 10
+P_COBRO = 15
+COBRO_DUDOSO = ("amenaza_cobro", "cobro_de_deuda")
+VERIFICA_LA_DEUDA = ("Antes de pagar, verifica la deuda con la empresa original por los canales de su página oficial, "
+                     "no por los números ni los enlaces del mensaje.")
+# Deterministic patterns from Pistas (real cases in datasets/casos_reales.csv) -> modalidad. The ones in
+# PATRON_ALTO are specific enough to be high risk on their own; the false relative stays "sospechoso".
+PATRON_MODALIDAD = {"falso_familiar": "falso_familiar", "robo_de_cuenta": "robo_de_cuenta", "falsa_multa": "falso_funcionario",
+                    "falso_empleo": "falso_empleo", "phishing": "suplantacion_bancaria"}
+PATRON_ALTO = {"robo_de_cuenta", "falsa_multa", "falso_empleo", "phishing"}
+P_PIDE ={"codigo_o_clave": 35, "instalar_app": 30, "mover_dinero": 30, "dinero": 20, "datos_personales": 20, "abrir_enlace": 10}
 # The false relative stays "sospechoso" (the guide's case 2): the Círculo confirms it with the real person.
 STRONG_MODALIDADES = {"suplantacion_bancaria", "falso_asesor", "falsa_compra", "paquete_retenido", "falso_funcionario",
                       "falso_premio", "falso_empleo"}
@@ -69,6 +82,8 @@ MODALIDADES = {
                      "No envíes datos ni pagues para reclamar nada: los premios reales no piden pagos ni códigos."),
     "falso_empleo": ("Falso empleo", "Ofrece un trabajo fácil a cambio de pagos o documentos.",
                      "No pagues por un empleo ni envíes documentos a desconocidos."),
+    "robo_de_cuenta": ("Robo de cuenta", "Se hace pasar por el soporte de WhatsApp u otra app para quedarse con tu cuenta.",
+                       "No respondas ni compartas códigos: WhatsApp nunca te escribe desde un número común. Activa la verificación en dos pasos."),
     "otra": ("Posible estafa", "Tiene señales típicas de una estafa.", ""),
 }
 QUE_HACER = {
@@ -149,12 +164,17 @@ def judge(e: Evidencia) -> AnalysisResult:
         add("INSTRUCCIONES_OCULTAS", "El mensaje intenta darle órdenes al sistema de análisis: es un intento de manipulación.",
             "Frases como «ignora tus instrucciones»", SignalSource.JUEZ, P_INYECCION)
 
+    patron = next((name for name in e.pistas.patrones if name in PATRON_MODALIDAD), None)
     imita = None
     for check in e.links:
         recognized.append(f"Enlace: {check.dominio}")
         age = e.ages.get(check.dominio)
         if check.oficial_de:
-            add("ENLACE_OFICIAL", f"El enlace es de la página oficial de {check.oficial_de}.", check.dominio, SignalSource.ENLACES, P_OFICIAL)
+            if patron:  # scams paste a real link to look trustworthy: it does not clear the rest of the message
+                add("ENLACE_OFICIAL", f"El enlace es de {check.oficial_de}, pero el mensaje tiene el patrón de una estafa.",
+                    check.dominio, SignalSource.ENLACES, 0)
+            else:
+                add("ENLACE_OFICIAL", f"El enlace es de la página oficial de {check.oficial_de}.", check.dominio, SignalSource.ENLACES, P_OFICIAL)
             links.append(LinkAnalysis(url=check.url, status=LinkStatus.OFFICIAL, reason=f"Página oficial de {check.oficial_de}"))
             continue
         status, reason = LinkStatus.UNCHECKED, "Sin reportes conocidos"
@@ -177,6 +197,10 @@ def judge(e: Evidencia) -> AnalysisResult:
             add("ENLACE_LISTA_NEGRA", "El enlace ya está reportado como peligroso.", check.dominio, SignalSource.ENLACES, P_LISTA_NEGRA)
             status, reason = LinkStatus.FLAGGED, "Reportado como peligroso"
         links.append(LinkAnalysis(url=check.url, status=status, reason=reason))
+    if e.pistas.enlace_disfrazado:
+        add("ENLACE_DISFRAZADO", "El enlace está escrito a propósito para que los filtros no lo detecten.", "", SignalSource.ENLACES, P_DISFRAZADO)
+    if e.pistas.acortados:
+        add("ENLACE_ACORTADO", "Usa un enlace acortado que esconde a dónde lleva.", e.pistas.acortados[0], SignalSource.ENLACES, P_ACORTADO)
 
     for name in e.pistas.entidades[:1]:
         add("ENTIDAD_CONOCIDA", f"Dice ser {name}.", name, SignalSource.PISTAS, P_ENTIDAD)
@@ -187,17 +211,33 @@ def judge(e: Evidencia) -> AnalysisResult:
     if aviso_de_codigo:
         add("AVISO_DE_CODIGO", "Es un aviso que te entrega un código y te pide no compartirlo: no te lo está pidiendo.",
             "", SignalSource.PISTAS, P_AVISO_CODIGO)
-    if p and p.modalidad in MODALIDADES:
-        add("MODALIDAD", MODALIDADES[p.modalidad][1], p.modalidad, SignalSource.PSICOLOGO, P_MODALIDAD)
+    # A deterministic pattern names the scam before the AI does: small models mislabel real cases.
+    patron_modalidad = PATRON_MODALIDAD.get(patron) if patron else None
+    ai_modalidad = p.modalidad if p and p.modalidad in MODALIDADES else None
+    if ai_modalidad == "falso_familiar" and not e.pistas.menciona_familia:
+        ai_modalidad = None  # small models call any debt or plea a false relative; it needs a relative
+    modalidad = patron_modalidad or ai_modalidad
+    if modalidad:
+        add("MODALIDAD", MODALIDADES[modalidad][1], modalidad, SignalSource.PISTAS if patron_modalidad else SignalSource.PSICOLOGO, P_MODALIDAD)
     if p and p.pide in P_PIDE and not (aviso_de_codigo and p.pide == "codigo_o_clave"):
         add("PIDE_" + p.pide.upper(), PIDE_LABEL[p.pide], p.pide, SignalSource.PSICOLOGO, P_PIDE[p.pide])
         recognized.append(f"Pide: {PIDE_CHIP[p.pide]}")
-    presion = (p.presion if p else bool(e.pistas.urgencia))
+    presion = (p.presion if p else bool(e.pistas.urgencia)) or (bool(e.pistas.urgencia) and bool(e.pistas.patrones))
     if presion:
         add("PRESION", "Usa urgencia, amenazas o premios para que actúes sin pensar.",
             ", ".join(e.pistas.urgencia[:3]) or "urgencia", SignalSource.PSICOLOGO if p else SignalSource.PISTAS, P_PRESION)
         recognized.append("Tácticas: urgencia o presión")
-    if p and p.pide == "nada" and not e.pistas.urls:
+    if "amenaza_cobro" in e.pistas.patrones:
+        add("AMENAZA_DE_COBRO", "Amenaza con cobro jurídico, embargo o corte y ofrece descuento por pagar ya: así presionan "
+            "las estafas y también los cobros dudosos. Verifica la deuda con la empresa por sus canales oficiales.",
+            "", SignalSource.PISTAS, P_AMENAZA)
+    if "cobro_de_deuda" in e.pistas.patrones:
+        add("COBRO_DE_DEUDA", "Es un cobro de deuda con descuento que llegó sin que lo pidieras: puede ser real o una cobranza falsa.",
+            "", SignalSource.PISTAS, P_COBRO)
+    if "pago_referencia" in e.pistas.patrones:
+        add("PAGO_POR_REFERENCIA", "Pide pagar en un punto de pago con una referencia que llegó por mensaje.", "", SignalSource.PISTAS, P_PAGO_REFERENCIA)
+    evidence_of_request = e.pistas.urls or e.pistas.montos or e.pistas.patrones or e.pistas.enlace_disfrazado
+    if p and p.pide == "nada" and not evidence_of_request:  # the AI's "asks nothing" never beats a link, an amount or a pattern
         add("NO_PIDE_NADA", "No pide datos, dinero ni clics.", "", SignalSource.PSICOLOGO, P_NO_PIDE)
 
     if e.campana and e.campana.similitud >= 0.6:
@@ -232,6 +272,13 @@ def judge(e: Evidencia) -> AnalysisResult:
         score = max(score, 75)  # rule: a known scam pattern that asks for money, a code or data
     if e.inyeccion or banco_alto:
         score = max(score, 70)  # rule: hidden orders for the AI, or a number the community marked red
+    if patron in PATRON_ALTO:
+        score = max(score, 75)  # rule: a pattern of real scams: account theft, fake fine, easy-money job, phishing
+    if patron == "falso_familiar":
+        score = max(score, 45)  # rule: the false relative is "sospechoso" until the Círculo confirms it
+    cobro = any(name in e.pistas.patrones for name in COBRO_DUDOSO)
+    if cobro:
+        score = max(score, 40)  # rule: an unrequested collection with threats or discounts is verified before paying
     if aviso_de_codigo and not banco_alto and not e.inyeccion:
         score = min(score, 30)  # rule: a code notice that asks for nothing back is not a scam by itself
 
@@ -244,8 +291,7 @@ def judge(e: Evidencia) -> AnalysisResult:
     else:
         level = risk_level(score)
 
-    modalidad = p.modalidad if p and p.modalidad in MODALIDADES else None
-    category = MODALIDADES[modalidad][0] if modalidad else ("Posible suplantación" if imita else None)
+    category = MODALIDADES[modalidad][0] if modalidad else ("Posible suplantación" if imita else "Cobro por verificar" if cobro else None)
     if category and e.tipo == "llamada":
         category = f"Llamada: {category.lower()}"
 
@@ -254,6 +300,8 @@ def judge(e: Evidencia) -> AnalysisResult:
         recommendations.append(QUE_HACER_LLAMADA)  # the guide's case 3; the link advice makes no sense in a call
     elif level in (RiskLevel.HIGH, RiskLevel.MEDIUM) and modalidad and MODALIDADES[modalidad][2]:
         recommendations.append(MODALIDADES[modalidad][2])
+    elif level in (RiskLevel.HIGH, RiskLevel.MEDIUM) and cobro:
+        recommendations.append(VERIFICA_LA_DEUDA)
     if level in QUE_HACER and not (level == RiskLevel.HIGH and recommendations):
         recommendations.append(QUE_HACER[level])
     if e.tipo == "llamada":

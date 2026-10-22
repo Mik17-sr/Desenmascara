@@ -1,5 +1,7 @@
 import asyncio
+import csv
 import json
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -14,6 +16,7 @@ from app.engine.pistas import extract, plural
 from app.schemas.contract import RiskLevel
 
 OFFICIAL = {"BancoAndino": "bancoandino.com"}
+REAL_CASES = Path(__file__).resolve().parent.parent / "datasets" / "casos_reales.csv"
 
 
 def ask_model(model_reply=None, error=None, text="Mensaje de prueba"):
@@ -80,6 +83,33 @@ def test_real_entities_official_websites():
     assert check_link("https://pagos-rapidos.xyz", real, ["Daviplata"]).imita_a == "Daviplata"
     for legit in ("https://meridian.com/nota", "https://www.google.com", "https://bit.ly/x"):  # short brands only as whole words
         assert check_link(legit, real, []).imita_a is None, legit
+
+
+def test_real_cases_with_rules_alone():
+    """datasets/casos_reales.csv: real messages. Even without the AI, the rules must catch every scam,
+    send every doubtful collection to "verify first" and leave the legitimate ones low."""
+    official = {name: list(sites) for name, sites in official_websites().items()}
+    want = {"si": {RiskLevel.HIGH, RiskLevel.MEDIUM}, "dudoso": {RiskLevel.HIGH, RiskLevel.MEDIUM}, "no": {RiskLevel.LOW}}
+    with open(REAL_CASES, encoding="utf-8") as rows:
+        for row in csv.DictReader(rows):
+            found = extract(row["texto"])
+            links = [check_link(u, official, found.entidades) for u in found.urls]
+            result = judge(Evidencia(tipo="mensaje", pistas=found, links=links, ages={}, psicologia=None, ia_consultada=False))
+            assert result.risk_level in want[row["es_estafa"]], (row["id"], result.risk_level, result.risk_score)
+
+
+def test_patterns_survive_ocr_without_spaces():
+    ocr = "Mama!!!! Mimovilsemehaestropeado,esteesmi numeronuevo ELotronumeroyanolousare"
+    assert "falso_familiar" in extract(ocr).patrones
+    assert extract("Ingresa: .col.cuctly.cc/.").enlace_disfrazado
+    assert "amenaza_cobro" not in extract("Sin embargo, te recordamos que tu pago fue recibido. Gracias.").patrones
+
+
+def test_a_code_that_is_only_delivered_is_a_notice():
+    notice = judge(evidence("489370 es tu código de verificación para U Distrital App.", Psicologia("otra", "codigo_o_clave", False)))
+    assert notice.risk_level == RiskLevel.LOW
+    ask = judge(evidence("Tu código es 774512. Respóndeme con el código para reclamar tu premio", Psicologia("falso_premio", "codigo_o_clave", True)))
+    assert ask.risk_level == RiskLevel.HIGH
 
 
 def test_published_official_lines_load():
