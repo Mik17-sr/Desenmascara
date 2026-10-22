@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import mask_value
 from app.db.models import Campana, Entidad, Indicador, NumeroOficial, Reporte, SolicitudRevision, Usuario, Verificacion, utcnow
+from app.engine import oficiales
 from app.engine.juez import BancoHit
 from app.services.usuarios import value_fingerprint
 
@@ -15,6 +16,11 @@ RECENT_DAYS = 30
 POINTS_PER_PERSON, PERSON_MAX = 6, 45
 POINTS_PER_RED, RED_MAX = 2, 20
 POINTS_CAMPAIGN = 15
+
+
+def published_line(tipo: str, valor: str) -> oficiales.OfficialLine | None:
+    """A line the entity publishes on its own website (datasets/lineas_oficiales.csv)."""
+    return oficiales.official_lines().get(valor) if tipo == "telefono" else None
 
 
 async def _official(session: AsyncSession, tipo: str, valor_hash: str) -> tuple[NumeroOficial, Entidad] | None:
@@ -71,6 +77,9 @@ async def lookup(session: AsyncSession, tipo: str, valor: str) -> BancoHit | Non
     if official:
         numero, entidad = official
         return BancoHit(tipo=tipo, visible=numero.valor_visible, nivel=0, personas=0, reportes=0, oficial_de=entidad.nombre)
+    line = published_line(tipo, valor)
+    if line:
+        return BancoHit(tipo=tipo, visible=line.linea, nivel=0, personas=0, reportes=0, oficial_de=line.entidad, sitio=line.sitio)
     indicador = await _indicador(session, tipo, valor_hash)
     if indicador is None:
         return None
@@ -101,7 +110,7 @@ async def report(session: AsyncSession, usuario: Usuario, tipo: str, valor: str,
 
 async def add_red_result(session: AsyncSession, tipo: str, valor: str, modalidad: str | None, campana_id: UUID | None) -> None:
     """A red result that contains this value adds evidence, even before anyone reports it."""
-    if await _official(session, tipo, value_fingerprint(tipo, valor)):
+    if published_line(tipo, valor) or await _official(session, tipo, value_fingerprint(tipo, valor)):
         return
     indicador = await get_or_create(session, tipo, valor)
     indicador.consultas_rojo += 1

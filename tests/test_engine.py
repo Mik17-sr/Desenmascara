@@ -9,7 +9,7 @@ from app.engine import archivista
 from app.engine.analyzer import INJECTION_PATTERN, Psicologia, classify
 from app.engine.enlaces import DomainAge, check_link, urlhaus
 from app.engine.juez import BancoHit, CampaignHit, Evidencia, judge
-from app.engine.oficiales import official_websites
+from app.engine.oficiales import line_to_call, official_lines, official_websites
 from app.engine.pistas import extract, plural
 from app.schemas.contract import RiskLevel
 
@@ -80,6 +80,13 @@ def test_real_entities_official_websites():
     assert check_link("https://pagos-rapidos.xyz", real, ["Daviplata"]).imita_a == "Daviplata"
     for legit in ("https://meridian.com/nota", "https://www.google.com", "https://bit.ly/x"):  # short brands only as whole words
         assert check_link(legit, real, []).imita_a is None, legit
+
+
+def test_published_official_lines_load():
+    lines = official_lines()
+    assert lines["576013430000"].entidad == "Bancolombia" and lines["576013430000"].sitio == "bancolombia.com"
+    assert line_to_call("Bancolombia").linea == "01 8000 9 12345"  # the national toll-free line first
+    assert line_to_call("Nequi") is None  # not published on its website: never guessed
 
 
 def test_urlhaus_flags_listed_links_and_is_off_without_a_key():

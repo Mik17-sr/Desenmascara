@@ -100,6 +100,8 @@ def format_not_connected(info: dict) -> str:
     """A real entity that has not joined Llamada Verificada: we cannot know, so we never say it is false."""
     entidad = info["entidad"]
     donde = f"en tu tarjeta o en {info['sitio']}" if info.get("sitio") else "en tu tarjeta"
+    if info.get("linea"):
+        donde = f"en tu tarjeta o a su línea oficial {info['linea']}"
     return join(
         f"🟡 {b('NO PUEDO CONFIRMARLO')}",
         f"{b(entidad)} {esc('todavía no está conectada a Llamada Verificada, así que no sé si de verdad es ella.')}",
@@ -124,6 +126,13 @@ def format_code(info: dict) -> str:
 
 def format_number(info: dict) -> str:
     valor = info.get("valor") or "Este número"
+    if info.get("sitio"):  # a line the entity publishes: it confirms where to call, never a call
+        return join(
+            f"🟢 {b('LÍNEA OFICIAL')}",
+            f"{esc('Es una línea de')} {b(info['oficial_de'])}{esc(', publicada en su página ' + info['sitio'] + '.')}",
+            f"{esc('Si te')} {b('llamaron')} {esc('desde este número, no basta: se puede falsificar en pantalla.')}",
+            f"{b('Qué hacer:')} {esc('cuelga y llama tú a este mismo número para confirmar.')}",
+        )
     if info.get("oficial_de"):
         return join(
             f"🟢 {b('NÚMERO OFICIAL')}",

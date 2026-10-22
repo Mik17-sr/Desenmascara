@@ -106,6 +106,18 @@ def test_llamada_verificada(client, entity_key):
     assert real_bank["estado"] == "no_conectada" and real_bank["entidad"] == "Bancolombia" and real_bank["sitio"] == "bancolombia.com"
 
 
+def test_published_official_lines(client):
+    found = client.get("/api/v1/banco/consultar", params={"tipo": "telefono", "valor": "601 343 0000"}).json()
+    assert found["oficial_de"] == "Bancolombia" and found["sitio"] == "bancolombia.com" and found["valor"] == "(601) 343 0000"
+    # A call that faked the line on screen gets reported: the line never shows up as a reported number.
+    for telegram_id in (301, 302):
+        body = consenting(client, telegram_id) | {"valor": "601 343 0000", "tipo": "telefono", "modalidad": "falso_asesor"}
+        client.post("/api/v1/bot/reportar", json=body, headers=BOT)
+    banco = client.get("/api/v1/dashboard/banco").json()
+    assert not any(r["valor"].endswith("0000") and r["valor"].startswith("+57 601") and r["personas"] == 2 for r in banco["mas_reportados"])
+    assert any(o["valor"] == "(601) 343 0000" and o["fuente"] == "sitio_oficial" for o in banco["lista_blanca"])
+
+
 def test_banco_counts_each_person_once(client):
     for telegram_id in (201, 202, 203):
         body = consenting(client, telegram_id) | {"valor": "+57 320 555 1234", "tipo": "telefono", "modalidad": "falso_asesor"}

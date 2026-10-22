@@ -55,6 +55,8 @@ SIGNAL = SignalItem(code="ENLACE_IMITA_OFICIAL", label="El enlace no es la pági
     format_call({"estado": "no_registrada", "entidad": "BancoAndino", "lineas_oficiales": ["+57 601 000 0002"]}),
     format_code({"estado": "correcto", "entidad": "BancoAndino"}),
     format_not_connected({"estado": "no_conectada", "entidad": "Bancolombia", "sitio": "bancolombia.com"}),
+    format_not_connected({"estado": "no_conectada", "entidad": "Bancolombia", "sitio": "bancolombia.com", "linea": "01 8000 9 12345"}),
+    format_number({"encontrado": True, "valor": "(601) 343 0000", "oficial_de": "Bancolombia", "sitio": "bancolombia.com", "nivel": 0}),
     format_code({"estado": "incorrecto"}),
     format_number({"encontrado": True, "valor": "+57 601 ••• 0000", "nivel": 90, "personas": 29, "reportes": 37,
                    "modalidad": "Falso asesor del banco", "estado": "normal", "oficial_de": None}),
@@ -85,6 +87,13 @@ def test_counts_of_one_read_well():
 def test_a_bank_that_has_not_joined_is_never_called_false():
     message = format_not_connected({"estado": "no_conectada", "entidad": "Bancolombia", "sitio": "bancolombia.com"})
     assert message.startswith("🟡 *NO PUEDO CONFIRMARLO*") and "bancolombia\.com" in message and "NO ES TU BANCO" not in message
+
+
+def test_a_published_line_tells_where_to_call_but_not_that_a_call_is_real():
+    message = format_number({"encontrado": True, "valor": "(601) 343 0000", "oficial_de": "Bancolombia", "sitio": "bancolombia.com", "nivel": 0})
+    assert message.startswith("🟢 *LÍNEA OFICIAL*") and "se puede falsificar" in message and "bancolombia\.com" in message
+    call = format_not_connected({"estado": "no_conectada", "entidad": "Bancolombia", "linea": "01 8000 9 12345"})
+    assert "01 8000 9 12345" in call
 
 
 def test_verified_call_code_is_in_a_box():

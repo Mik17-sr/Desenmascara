@@ -271,6 +271,19 @@ npm run start                        # http://localhost:3000
 - La llave del equipo (revisiones y lista blanca) es `ADMIN_API_KEY` de `.env`.
 - Documentación de la API: http://127.0.0.1:8000/docs
 
+### Entrega con datos reales
+
+Para mostrarlo a una empresa sin nada ficticio:
+
+```powershell
+python scripts/limpiar_datos.py --todo   # quita BancoAndino, Tienda Ejemplo, los usuarios «Demo» y la actividad de prueba
+python scripts/crear_entidad.py "Nombre de la entidad" --dominio entidad.com --linea "+57 601 000 0000"   # la conecta a Llamada Verificada
+```
+
+- `datasets/dominios_oficiales.csv`: páginas oficiales de 27 entidades reales (bancos, DIAN, Policía, mensajerías). Con ellas, un enlace a `bancolombia.com` es oficial y `bancolombia-seguro.co` es una imitación.
+- `datasets/lineas_oficiales.csv`: 22 líneas de atención que cada entidad publica en su propia página, con la página de origen. El bot las da como «llama tú a este número», nunca como prueba de que una llamada es real: el número en pantalla se puede falsificar.
+- Revisen y amplíen las dos listas con fuentes oficiales antes de producción. Nunca agreguen números de estafadores a mano: el Banco de números se llena con los reportes de las personas, y un número inventado puede ser el de alguien real.
+
 ---
 
 ## 14. Pasar a Supabase (RLS y Realtime)

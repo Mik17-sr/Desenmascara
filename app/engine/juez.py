@@ -100,6 +100,7 @@ class BancoHit:
     modalidad: str | None = None
     estado: str = "normal"
     oficial_de: str | None = None
+    sitio: str | None = None  # where a published official line comes from
 
 
 @dataclass

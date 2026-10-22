@@ -112,7 +112,7 @@ def describe_hit(hit) -> dict:
                                               {"high": "Alto riesgo", "medium": "Sospechoso", "low": "Bajo riesgo"}[risk_level(hit.nivel).value])
     return {"encontrado": True, "valor": hit.visible, "nivel": hit.nivel, "palabra": word, "personas": hit.personas,
             "reportes": hit.reportes, "modalidad": MODALIDADES.get(hit.modalidad or "", (None,))[0], "estado": hit.estado,
-            "oficial_de": hit.oficial_de}
+            "oficial_de": hit.oficial_de, "sitio": hit.sitio}
 
 
 @router.get("/banco/consultar", dependencies=[Depends(limit_by_ip)])

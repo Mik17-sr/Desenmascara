@@ -17,7 +17,7 @@ from app.core.ratelimit import bot_user_limiter
 from app.core.security import require_bot
 from app.db.models import Usuario
 from app.engine.juez import MODALIDADES, risk_level
-from app.engine.oficiales import official_websites
+from app.engine.oficiales import line_to_call, official_websites
 from app.engine.pistas import Pistas, extract
 from app.schemas.contract import AnalysisInput, AnalysisResult, RiskLevel, SignalItem, SignalSource
 from app.services import banco, circulo, entidades, llamadas, usuarios, verificaciones
@@ -161,7 +161,9 @@ async def verified_call(body: LlamadaIn, background_tasks: BackgroundTasks, db: 
         named = extract(body.texto).entidades
         if named:  # a real entity that has not joined: say so, never "no es tu banco"
             sites = official_websites().get(named[0], ())
-            return {"estado": "no_conectada", "entidad": named[0], "sitio": sites[0] if sites else None, "entidades": connected}
+            line = line_to_call(named[0])
+            return {"estado": "no_conectada", "entidad": named[0], "sitio": sites[0] if sites else None,
+                    "linea": line.linea if line else None, "entidades": connected}
         return {"estado": "entidad_desconocida", "entidades": connected}
     if not user.telefono_hash:
         return {"estado": "falta_telefono", "entidad": entidad.nombre}

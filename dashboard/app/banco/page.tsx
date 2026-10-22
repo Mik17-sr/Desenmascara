@@ -217,15 +217,16 @@ export default function BancoPage() {
               ) : <Empty icon={CheckCircle}>No hay solicitudes pendientes.</Empty>}
             </Card>
 
-            <Card title="Lista blanca · números oficiales" icon={CheckCircle}>
-              <ul className="space-y-3 text-sm">
+            <Card title="Lista blanca · números oficiales" icon={CheckCircle}
+                  action={data && <span className="text-xs text-muted">{data.lista_blanca.length}</span>}>
+              <ul className="-mr-2 max-h-96 space-y-3 overflow-y-auto pr-2 text-sm">
                 {data?.lista_blanca.map((o) => (
                   <li key={o.entidad + o.valor} className="flex gap-3">
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-risk-low-bg text-risk-low"><CheckCircle width={15} height={15} /></span>
                     <div className="min-w-0">
                       <div><strong>{o.entidad}</strong> <span className="text-muted">· {o.canal}</span></div>
                       <div className="tabular">{o.valor}</div>
-                      <div className="text-xs text-muted">{o.fuente === "registro" ? "registrado por la entidad" : `página oficial · verificado por ${o.verificado_por}`}</div>
+                      <div className="text-xs text-muted">{o.fuente === "registro" ? "registrado por la entidad" : o.fuente === "sitio_oficial" ? `publicada en ${o.verificado_por}` : `página oficial · verificado por ${o.verificado_por}`}</div>
                     </div>
                   </li>
                 ))}

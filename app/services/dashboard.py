@@ -6,8 +6,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Campana, Entidad, Indicador, LlamadaRegistrada, NumeroOficial, Reporte, SolicitudRevision, Verificacion, utcnow
+from app.engine import oficiales as published
 from app.engine.juez import MODALIDADES, risk_level
 from app.services import llamadas
+from app.services.usuarios import value_fingerprint
 
 COLOMBIA = timedelta(hours=-5)
 LEVEL_WORD = {"high": "Alto", "medium": "Sospechoso", "low": "Bajo"}
@@ -101,6 +103,10 @@ async def banco_view(session: AsyncSession) -> dict:
     oficiales = (await session.execute(
         select(NumeroOficial, Entidad).join(Entidad, Entidad.id == NumeroOficial.entidad_id).order_by(NumeroOficial.verificado_at.desc())
     )).all()
+    lines = published.official_lines()
+    # An official number is never shown among the most reported, even if people reported a call that faked it.
+    official_hashes = {n.valor_hash for n, _ in oficiales} | {value_fingerprint("telefono", number) for number in lines}
+    top = [i for i in top if i.valor_hash not in official_hashes]
     days = []
     start = _day_start()
     for back in range(6, -1, -1):
@@ -113,7 +119,7 @@ async def banco_view(session: AsyncSession) -> dict:
         "alto_riesgo": (await session.scalar(select(func.count()).select_from(Indicador).where(Indicador.nivel_riesgo >= 70))) or 0,
         "reportes_semana": (await session.scalar(select(func.count()).select_from(Reporte).where(Reporte.creado_at >= week))) or 0,
         "personas_semana": (await session.scalar(select(func.count(func.distinct(Reporte.usuario_id))).where(Reporte.creado_at >= week))) or 0,
-        "oficiales": len(oficiales),
+        "oficiales": len(oficiales) + len(lines),
         "mas_reportados": [
             {"valor": i.valor_visible, "tipo": i.tipo, "personas": i.personas_distintas, "nivel": i.nivel_riesgo,
              "palabra": "En revisión" if i.estado == "en_revision" else LEVEL_WORD[risk_level(i.nivel_riesgo).value],
@@ -126,6 +132,9 @@ async def banco_view(session: AsyncSession) -> dict:
         "lista_blanca": [
             {"entidad": e.nombre, "valor": n.valor_visible, "canal": n.canal, "fuente": n.fuente, "verificado_por": n.verificado_por}
             for n, e in oficiales
+        ] + [
+            {"entidad": line.entidad, "valor": line.linea, "canal": line.donde, "fuente": "sitio_oficial", "verificado_por": line.sitio}
+            for line in lines.values()
         ],
         "reportes_por_dia": days,
     }
