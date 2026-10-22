@@ -3,9 +3,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { useSyncExternalStore } from "react";
 
-// Only the public (anon) key: with RLS it can read the anonymous event table and views, nothing else.
+// Only the public key: with RLS it can read the anonymous event table and views, nothing else.
+// New Supabase projects call it "publishable" (sb_publishable_...); older ones, "anon".
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const supabase: SupabaseClient | null = url && anonKey ? createClient(url, anonKey) : null;
 

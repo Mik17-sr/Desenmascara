@@ -427,7 +427,7 @@ El repositorio es público, así que Render lo encuentra pegando la URL `https:/
 | Build Command | `npm ci && npm run build` |
 | Publish Directory | `out` |
 
-   Y en **Environment Variables**: `NEXT_OUTPUT` = `export`, `NODE_VERSION` = `22` y `NEXT_PUBLIC_API_URL` = la dirección del paso 7 + `/api/v1` (por ejemplo `https://desenmascara-api.onrender.com/api/v1`). Para el tiempo real, también `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+   Y en **Environment Variables**: `NEXT_OUTPUT` = `export`, `NODE_VERSION` = `22` y `NEXT_PUBLIC_API_URL` = la dirección del paso 7 + `/api/v1` (por ejemplo `https://desenmascara-api.onrender.com/api/v1`). Para el tiempo real, también `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Supabase → **Connect**: la *Project URL* y la llave *publishable*, que es pública).
 9. **Deploy Static Site**. Copia su dirección, ponla en `DASHBOARD_ORIGINS` de la API (paso 5) y guarda: la API se reinicia sola. Si cambias `NEXT_PUBLIC_API_URL`, vuelve a desplegar el Dashboard (**Manual Deploy**): se lee al construirlo.
 
 **Qué esperar del plan gratis**
