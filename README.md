@@ -2,7 +2,7 @@
 
 **Evento:** Colombia 5.0 Hackathon (16 al 18 de octubre de 2026)  
 **Versión:** 7.0 · Edición Telegram Nativo  
-**Canal Ciudadano:** Telegram Bot API (`@DesenmascaraBot`)  
+**Canal Ciudadano:** Telegram Bot API ([@Desenmascara_bot](https://t.me/Desenmascara_bot))  
 **Equipo:** Luis Guillermo Nieto Patiño · Miguel · Gerhard Arce · IngBocadillo  
 **Lema:** *Reenvía el mensaje. Desenmascara la estafa. Las demás herramientas adivinan; Desenmascara confirma con la fuente.*
 
@@ -67,7 +67,7 @@ Desenmascara protege al ciudadano a través de tres capas coordinadas:
 
 ## 3. ¿Por qué Telegram Bot API?
 Para el hackathon, Telegram representa una ventaja estratégica decisiva:
-- **Cero Fricción para el Jurado:** No requiere unirse a sandboxes con códigos manuales ni esperar aprobaciones. Cualquier jurado abre la cámara de su celular, escanea el código QR y prueba `@DesenmascaraBot` al instante.
+- **Cero Fricción para el Jurado:** No requiere unirse a sandboxes con códigos manuales ni esperar aprobaciones. Cualquier jurado abre la cámara de su celular, escanea el código QR y prueba `@Desenmascara_bot` al instante.
 - **Soporte Multimodal Nativo:** Recepción directa de capturas de pantalla, notas de voz OGG/Opus y compartición criptográfica de contacto telefónico (`request_contact=True`).
 - **Botones Interactivos:** Teclados nativos que guían paso a paso al usuario sin riesgo de errores de digitación.
 
@@ -77,7 +77,7 @@ Para el hackathon, Telegram representa una ventaja estratégica decisiva:
 
 ```
                       [CANALES DE ENTRADA]
-  Telegram Bot (@DesenmascaraBot) ─── Capturas / Audios ─── Dashboard Web
+  Telegram Bot (@Desenmascara_bot) ─── Capturas / Audios ─── Dashboard Web
                                 │
                                 ▼
                    [SERVIDOR FASTAPI (Python 3.12)]
@@ -107,7 +107,7 @@ Semáforo · Razones · Qué hacer               Radar · Rayos X · Banco · En
 ---
 
 ## 5. Las 6 Piezas del Prototipo
-1. **Bot de Telegram (`@DesenmascaraBot`):** La interfaz ciudadana. Menú de 6 botones interactivos y enrutamiento inteligente sin menú.
+1. **Bot de Telegram (`@Desenmascara_bot`):** La interfaz ciudadana. Menú de 6 botones interactivos y enrutamiento inteligente sin menú.
 2. **El Cerebro:** Motor analítico de 6 detectives con diagnóstico explicable en menos de 8 segundos.
 3. **Módulo de Llamadas (Vishing):** Consulta de números reportados y análisis de notas de voz transcribiendo el audio con Whisper.
 4. **Dashboard en Tiempo Real:** Aplicación web en Next.js con 4 vistas: Radar de campañas, Verificador con Rayos X, Banco de números y Panel de la entidad.
@@ -151,7 +151,7 @@ Construido bajo estándares internacionales **OWASP Top 10 for LLM** y **OWASP A
 | `01_CONTRATO_COMPARTIDO.md` | Esquemas canónicos de datos Pydantic, JSON y contratos de APIs. |
 | `02_AGENTE_BACKEND.md` | Servidor FastAPI, webhook seguro de Telegram y orquestación. |
 | `03_AGENTE_DETECCION_IA.md` | El Cerebro de 6 detectives, prompts, pgvector y scoring determinista. |
-| `04_AGENTE_TELEGRAM.md` | Interfaz conversacional nativa en Telegram (`@DesenmascaraBot`). |
+| `04_AGENTE_TELEGRAM.md` | Interfaz conversacional nativa en Telegram (`@Desenmascara_bot`). |
 | `05_AGENTE_DATOS.md` | DDL de Supabase, 12 tablas, 5 vistas, pgvector y políticas RLS. |
 | `06_AGENTE_SEGURIDAD.md` | Implementación y auditoría de las 13 defensas de ciberseguridad. |
 | `07_AGENTE_QA.md` | Dataset de 140 casos, tests automatizados y guion del Demo Day. |
@@ -255,6 +255,8 @@ En otra terminal, el bot (pon antes tu token de @BotFather en `TELEGRAM_BOT_TOKE
 .venv\Scripts\Activate.ps1
 python -m app.bot.client
 ```
+
+El bot del equipo es **[@Desenmascara_bot](https://t.me/Desenmascara_bot)**, con guion bajo; @desenmascaraBot es otro bot que no es nuestro. Un mismo bot solo puede correr en un computador a la vez: si dos lo encienden, Telegram los hace chocar.
 
 Al arrancar, el bot se pone el perfil del manual: nombre «Desenmascara», descripción «bot antiestafas», menú de comandos y el logo (`app/bot/assets/avatar.png`) si todavía no tiene foto. Solo envía a Telegram lo que cambió.
 
