@@ -47,7 +47,7 @@ services:
         sync: false
       - key: ADMIN_API_KEY
         sync: false
-      # The Dashboard's address, e.g. https://desenmascara-dashboard.onrender.com (CORS).
+      # The Dashboard's real address, as Render shows it (ours: https://desenmascara.onrender.com). CORS.
       - key: DASHBOARD_ORIGINS
         sync: false
 

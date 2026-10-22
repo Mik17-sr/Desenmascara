@@ -213,19 +213,19 @@ Esta versión implementa la guía del proyecto (`docs/`, v7.0) con tres cambios:
 |---|---|---|
 | WhatsApp con Twilio | **Telegram** | Ya existía el bot; no hace falta sandbox ni cuenta de Twilio. Como un bot de Telegram no puede escribir primero, el Círculo usa enlaces de invitación. |
 | Supabase (PostgreSQL + pgvector) | **SQLite local o Supabase**, con las 12 tablas de la guía y una más para el acceso de las entidades | En local funciona sin cuentas. Con Supabase hay RLS y Realtime (ver sección 14). Las huellas de campañas son MinHash en JSON en lugar de pgvector. |
-| LLM por API (Claude, GPT o Gemini) | **llama3.2 local con Ollama** | Sin claves ni costo. En CPU tarda 5-7 s por análisis, así que la IA solo clasifica y el juez arma la explicación. |
+| LLM por API (Claude, GPT o Gemini) | **llama3.2 local con Ollama**; en Render, **solo reglas** (`IA_LOCAL=false`) | Sin claves ni costo. En CPU tarda 5-7 s por análisis, así que la IA solo clasifica y el juez arma la explicación. Ollama no cabe en el plan gratis de Render: allí las reglas leen lo mismo que leía la IA (qué pide el mensaje y su modalidad) y detectan lo mismo (sección 15). |
 
 ---
 
 ## 12. Qué hay en el código
 
-- **Bot de Telegram** (`app/bot/`): menú de 6 opciones, detección automática (mensaje, captura, número, nota de voz, «¿X me está llamando?», «ya caí»), consentimiento (Ley 1581), Llamada Verificada, Círculo de Confianza, Antes de pagar, kit de denuncia, reportes y revisión por el dueño.
+- **Bot de Telegram** (`app/bot/`): menú de 6 opciones, detección automática (mensaje, captura, número, nota de voz, «¿X me está llamando?», «ya caí»), consentimiento (Ley 1581), Llamada Verificada, Círculo de Confianza con validación del familiar (su número y la confirmación del protegido), Antes de pagar, kit de denuncia con «Relato de los hechos» para la Policía, reportes de números y enlaces, y revisión por el dueño. En tu computador corre por *polling* (`python -m app.bot.client`); en un servidor, dentro de la API por *webhook* (`app/bot/webhook.py`).
 - **El cerebro** (`app/engine/`), con las seis revisiones de la sección 11:
 
   | Revisión | Archivo | Cómo |
   |---|---|---|
   | 1 · Traductor | `traductor.py` | OCR (RapidOCR) y notas de voz (faster-whisper), en memoria |
-  | 2 · Pistas | `pistas.py` | Reglas: enlaces, teléfonos, llaves Bre-B, cuentas, montos, códigos |
+  | 2 · Pistas | `pistas.py` | Reglas: enlaces (también los que el OCR pega), teléfonos, llaves Bre-B, cuentas, montos, códigos, qué pide el mensaje (un código, datos, dinero) y los patrones de las modalidades reales |
   | 3 · Enlaces | `enlaces.py` | Sitio oficial, imitaciones (homoglifos, punycode, casi iguales), edad con RDAP; Safe Browsing y URLhaus si hay llave |
   | 4 · Psicólogo | `analyzer.py` | IA: modalidad, qué pide, si presiona. Respuesta con esquema JSON fijo |
   | 5 · Archivista | `archivista.py` | Huellas MinHash para reconocer campañas aunque cambien palabras |
@@ -290,35 +290,38 @@ python scripts/crear_entidad.py "Nombre de la entidad" --correo panel@entidad.co
 
 ## 14. Pasar a Supabase (RLS y Realtime)
 
-1. Crea un proyecto en [supabase.com](https://supabase.com).
+1. Crea un proyecto en [supabase.com](https://supabase.com). En **Security**: deja **Enable Data API**, quita **Automatically expose new tables** (las migraciones dan solo los permisos necesarios) y marca **Enable automatic RLS**.
 2. En **SQL Editor**, pega y ejecuta en orden `supabase/migrations/20261021120000_esquema_inicial.sql`, `supabase/migrations/20261022120000_accesos_entidad.sql` y `supabase/migrations/20261022160000_validar_familiar.sql` (o `supabase db push` con la CLI). Crean las tablas con RLS, las 5 vistas anónimas y la tabla `eventos_dashboard`, que ya queda publicada en Realtime.
-3. En **Project Settings → Database → Connection string**, copia la de **Session pooler** (funciona con IPv4) y ponla en `.env`:
-   `DATABASE_URL=postgresql://postgres.<proyecto>:<contraseña>@aws-0-<región>.pooler.supabase.com:5432/postgres`
+3. En **Connect → Connection String**, con **Method: Session pooler**, copia la cadena, cambia `[YOUR-PASSWORD]` por tu contraseña y ponla en `.env`:
+   `DATABASE_URL=postgresql://postgres.<proyecto>:<contraseña>@aws-<0 o 1>-<región>.pooler.supabase.com:5432/postgres`
+   Los proyectos nuevos usan `aws-1-…`. Nunca la de **Direct connection** (`db.<proyecto>.supabase.co`): solo tiene IPv6 y desde Render falla con «No address associated with hostname».
 4. Copia tus datos locales (opcional): `python scripts/migrar_a_supabase.py`. Usa los mismos `HMAC_SECRET` y `ENCRYPTION_KEY`.
 5. En el Dashboard, copia `dashboard/.env.local.example` a `dashboard/.env.local` con la **Project URL** y la llave pública **anon** (Project Settings → API), y vuelve a ejecutar `npm run build` y `npm run start`. La barra lateral mostrará «Tiempo real · Realtime».
 
 Cómo queda protegido: la API se conecta como `postgres` (dueño de las tablas); `anon` y `authenticated` no pueden leer ninguna tabla con datos, solo las vistas agregadas y `eventos_dashboard`, que guarda qué tabla cambió y el nivel de riesgo, sin texto, números ni usuarios. Nunca pongas la llave `service_role` en el Dashboard.
 
-Para probar la migración sin Supabase: `TEST_DATABASE_URL=postgresql://... python -m pytest` corre las 70 pruebas sobre un PostgreSQL vacío con la migración aplicada.
+Para probar la migración sin Supabase: `TEST_DATABASE_URL=postgresql://... python -m pytest` corre todas las pruebas sobre un PostgreSQL vacío con la migración aplicada.
 
 ---
 
 ## 15. Pruebas y medición
 
 ```powershell
-python -m pytest                     # 70 pruebas: motor, API de punta a punta y bot (sin red ni IA real)
-python scripts/evaluar.py            # mide sensibilidad, falsos positivos y P90 contra la API en marcha
+python -m pytest                                   # 115 pruebas: motor, API de punta a punta, bot y Render (sin red ni IA real)
+python scripts/evaluar.py                          # mide contra la API en marcha con los 26 casos de prueba
+python scripts/evaluar.py datasets/casos_reales.csv  # y con los 23 mensajes reales del equipo
 ```
 
-`datasets/casos_prueba.csv` trae 26 casos **sintéticos** para empezar. La guía pide 100 mensajes reales (50 estafas y 50 legítimos), 20 llamadas y 20 compras con las mismas columnas.
+`datasets/casos_prueba.csv` trae 26 casos **sintéticos**; `datasets/casos_reales.csv`, 23 mensajes **reales** del equipo (20 estafas, entre ellas 14 cobranzas falsas, y 3 legítimos). La guía pide 100 mensajes reales (50 estafas y 50 legítimos), 20 llamadas y 20 compras con las mismas columnas. `evaluar.py` envía los casos como `evaluacion`: se responden igual, pero nunca se guardan, así que no inflan el Radar ni el Banco.
 
-Última medición en un portátil sin GPU (i5-1035G1), 30 mensajes por la misma llamada que hace el bot:
+Última medición (22/10/2026), en un portátil sin GPU (i5-1035G1):
 
-| | Resultado |
-|---|---|
-| Estafas marcadas como alto riesgo | 11 de 16 (3 más como sospechoso) |
-| Mensajes legítimos en bajo riesgo | 11 de 12, sin falsos positivos |
-| Tiempo | mediana 6,4 s; 27 de 30 dentro de los 8 s |
+| | Con IA (tu computador) | Solo reglas (como en Render) |
+|---|---|---|
+| Estafas de prueba detectadas | 14 de 14 | 14 de 14 |
+| Estafas reales detectadas | 20 de 20 | 20 de 20 |
+| Falsos positivos | 0 de 12 de prueba y 0 de 3 reales | 0 de 12 y 0 de 3 |
+| Tiempo | P90 4,8 s (prueba) y 6,7 s (reales) | P90 1,1 s |
 
 Con otras aplicaciones abiertas la CPU se satura y algunas respuestas pasan de 8 s. Para tener margen hace falta GPU o un LLM en la nube; el modelo se cambia con `OLLAMA_MODEL`.
 
@@ -340,16 +343,16 @@ El modelo de 1B es más rápido, pero deja pasar 9 de las 14 estafas: nos quedam
 
 | Defensa | Estado |
 |---|---|
-| Autenticidad del canal | El bot llama a la API con `BOT_API_SECRET`; usa polling, así que no hay webhook que firmar. |
+| Autenticidad del canal | El bot llama a la API con `BOT_API_SECRET`. En Render, Telegram envía cada mensaje al webhook con una llave secreta (`X-Telegram-Bot-Api-Secret-Token`, derivada de `BOT_API_SECRET`); sin ella, la API responde 401. |
 | Inyección de instrucciones | Mensaje aislado entre comillas, esquema JSON fijo, regla que detecta órdenes (+20 y mínimo alto riesgo) y el juez decide. |
 | Enlaces y SSRF | Los enlaces nunca se abren: solo se compara el nombre y se consulta RDAP en un host fijo, con tiempo límite. Con llave (`GOOGLE_SAFE_BROWSING_KEY`, `URLHAUS_AUTH_KEY`), el texto del enlace se busca en Safe Browsing y URLhaus, también en hosts fijos. |
-| Rate limiting | 20 consultas por minuto por IP en lo público y 12 por persona en el bot. |
+| Rate limiting | 20 consultas por minuto por IP en lo público, 12 análisis por persona en el bot y 40 reportes aparte (un reporte por número o enlace no gasta los análisis). |
 | Secretos | En `.env` (ignorado por git), generados por `setup_local.py`. Falta gitleaks en CI. |
 | Acceso a datos | RLS en las 14 tablas de Supabase y permisos revocados a `anon`/`authenticated`; el Dashboard solo lee agregados anónimos; entidades con correo y contraseña (scrypt, con límite de intentos) y sesión firmada; la llave de integración se guarda como hash. |
-| Cifrado | Teléfonos, llaves e ids de Telegram como HMAC-SHA256; códigos y chats cifrados (Fernet). Falta TLS al desplegar. |
+| Cifrado | Teléfonos, llaves e ids de Telegram como HMAC-SHA256; códigos y chats cifrados (Fernet). En Render todo va por HTTPS, y la conexión con Supabase va cifrada (TLS). |
 | Datos personales | Se borran nombres, números y cuentas antes de guardar; audios en memoria; `/borrar` elimina a la persona. |
 | Envenenamiento | Un voto por persona y valor, reportes viejos a la mitad, revisión por el dueño. |
-| Círculo | Doble consentimiento y salida con un mensaje. |
+| Círculo | El familiar se valida: comparte con Telegram el mismo número que dio el protegido y el protegido confirma que es él; el enlace dura 48 horas y sirve una vez; un número distinto no entra y el protegido recibe la alerta. Salida con un mensaje. |
 | Llamada Verificada | Solo responde a la persona llamada (su propio contacto de Telegram); código de un uso que se borra a los 15 minutos. |
 | Archivos | Tipo real por sus bytes, límites de tamaño y proceso en memoria. |
 | Dependencias | Pendiente: pip-audit, npm audit y Dependabot en CI. |
@@ -358,7 +361,7 @@ El modelo de 1B es más rápido, pero deja pasar 9 de las 14 estafas: nos quedam
 
 ## 17. Qué funciona y qué falta
 
-Funciona: el bot con mensajes, capturas, números y notas de voz; Llamada Verificada con BancoAndino (ficticio); Círculo de Confianza con invitaciones validadas (el familiar comparte el mismo número que dio el protegido, y el protegido confirma que es él; el enlace dura 48 horas y sirve una vez); Banco de números con lista blanca y revisiones; Antes de pagar; el Dashboard con sus 4 vistas.
+Funciona y está publicado en Render (sección 18): el bot con mensajes, capturas, números y notas de voz; Llamada Verificada con las entidades conectadas (hoy, «Desenmascara», para probar); Círculo de Confianza con invitaciones validadas (el familiar comparte el mismo número que dio el protegido, y el protegido confirma que es él; el enlace dura 48 horas y sirve una vez); Banco de números con lista blanca y revisiones; Antes de pagar; el Dashboard con sus 4 vistas.
 
 Falta o es visión: WhatsApp (Twilio); los 4 casos reales del equipo y el dataset real; escaneos de seguridad en CI; entidades reales conectadas. El despliegue en Render ya está listo en `render.yaml` (sección 18).
 
@@ -410,7 +413,7 @@ El repositorio es público, así que Render lo encuentra pegando la URL `https:/
 | `DATABASE_URL` | Supabase, Session pooler |
 | `TELEGRAM_BOT_TOKEN` | tu `.env` (el token de @BotFather) |
 | `HMAC_SECRET`, `ENCRYPTION_KEY`, `BOT_API_SECRET`, `ADMIN_API_KEY` | tu `.env`, **los mismos valores**: las huellas y los datos cifrados solo se abren con ellos |
-| `DASHBOARD_ORIGINS` | la dirección del Dashboard del paso 9, por ejemplo `https://desenmascara-dashboard.onrender.com` |
+| `DASHBOARD_ORIGINS` | la dirección del Dashboard del paso 9 (la nuestra: `https://desenmascara.onrender.com`) |
 
 6. Apaga el bot de tu computador y toca **Deploy Web Service**. Al arrancar, la API registra el webhook y desde ahí Telegram le envía los mensajes a Render. Mientras el bot esté publicado, `python -m app.bot.client` no arranca, para no quitárselo al servidor; con `--forzar` lo traes de vuelta a tu computador.
 7. Copia la dirección que Render le dio (arriba, por ejemplo `https://desenmascara-api.onrender.com`) y abre `/health`: debe decir `"base_de_datos": "ok"` e `"ia": "apagada"`. Escríbele «Hola» a @Desenmascara_bot.
@@ -429,6 +432,26 @@ El repositorio es público, así que Render lo encuentra pegando la URL `https:/
 
    Y en **Environment Variables**: `NEXT_OUTPUT` = `export`, `NODE_VERSION` = `22` y `NEXT_PUBLIC_API_URL` = la dirección del paso 7 + `/api/v1` (por ejemplo `https://desenmascara-api.onrender.com/api/v1`). Para el tiempo real, también `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Supabase → **Connect**: la *Project URL* y la llave *publishable*, que es pública).
 9. **Deploy Static Site**. Copia su dirección, ponla en `DASHBOARD_ORIGINS` de la API (paso 5) y guarda: la API se reinicia sola. Si cambias `NEXT_PUBLIC_API_URL`, vuelve a desplegar el Dashboard (**Manual Deploy**): se lee al construirlo.
+
+**Dónde quedó publicado**
+
+| | Dirección |
+|---|---|
+| Bot | [@Desenmascara_bot](https://t.me/Desenmascara_bot) |
+| API | `https://desenmascara-api.onrender.com` (`/health` para revisarla) |
+| Dashboard | `https://desenmascara.onrender.com` |
+| Base de datos | Supabase, proyecto `Desemarcara_Bots` (West US, Oregon) |
+
+**Si algo falla**
+
+| Lo que ves | Por qué | Arreglo |
+|---|---|---|
+| La API no arranca: `socket.gaierror … No address associated with hostname` | `DATABASE_URL` es la de *Direct connection* (solo IPv6) | La del **Session pooler** (`aws-1-…pooler.supabase.com:5432`) |
+| La API no arranca: «En Render falta DATABASE_URL» | Falta la variable: con SQLite los datos se borrarían en cada reinicio | Agrégala y vuelve a desplegar |
+| El Dashboard dice «La API respondió 404» | `NEXT_PUBLIC_API_URL` quedó vacía al construirlo | Ponla y **Clear build cache & deploy** |
+| El Dashboard no carga datos y la API no ve sus consultas | `DASHBOARD_ORIGINS` no es la dirección real del Dashboard | Copia la que muestra Render (puede no ser `desenmascara-dashboard…`) |
+| Un cambio subido a GitHub no aparece | Con la URL pública Render no despliega solo | **Manual Deploy → Deploy latest commit** |
+| El bot tardó un minuto | El servicio gratis se había dormido | Normal; Telegram reintenta y el mensaje llega |
 
 **Qué esperar del plan gratis**
 
