@@ -124,7 +124,10 @@ function SystemStatus() {
             {label}: <span className={ok ? "text-ink" : "text-risk-high"}>{text}</span>
           </span>
         ))}
-        <span className="ml-auto">v{up ? state.version : "—"} · datos de prueba ficticios</span>
+        <span className="ml-auto flex items-center gap-3">
+          {up && state.demo && <span className="rounded-full bg-risk-mid-bg px-2 py-0.5 font-semibold text-risk-mid-ink">Datos de demostración</span>}
+          Desenmascara v{up ? state.version : "—"}
+        </span>
       </div>
     </footer>
   );

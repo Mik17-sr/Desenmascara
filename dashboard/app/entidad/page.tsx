@@ -6,6 +6,7 @@ import { Building, CheckCircle, Copy, Key, Logout, Phone, ShieldCheck } from "@/
 import { Button, Card, Empty, Notice, PageHeader } from "@/components/ui";
 import { ApiError, api, postJSON, type Llamada } from "@/lib/api";
 import { ago } from "@/lib/format";
+import { useDemo } from "@/lib/useDemo";
 import { useLive } from "@/lib/useLive";
 
 const KEY = "desenmascara.entidad";
@@ -37,6 +38,7 @@ export default function EntidadPage() {
   const [entity, setEntity] = useState<{ nombre: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
+  const demo = useDemo();
 
   const login = useCallback(async (candidate: string, keep: boolean) => {
     setError(null);
@@ -97,7 +99,9 @@ export default function EntidadPage() {
             </label>
             <Button disabled={!key} className="w-full py-2.5">Entrar al panel</Button>
             {error && <Notice>{error}</Notice>}
-            <p className="text-xs text-muted">Para la demo, `python scripts/seed_demo.py --nueva-llave` muestra la llave de BancoAndino (entidad ficticia) y un enlace que entra sin escribirla.</p>
+            <p className="text-xs text-muted">{demo
+              ? "Demostración: python scripts/seed_demo.py --nueva-llave muestra la llave de BancoAndino (entidad ficticia) y un enlace que entra sin escribirla."
+              : "La llave te la entrega el equipo de Desenmascara cuando conecta tu entidad a Llamada Verificada."}</p>
           </form>
         </Card>
       </div>

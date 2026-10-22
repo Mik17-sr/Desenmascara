@@ -77,7 +77,7 @@ export type Radar = {
   llamadas_ultimas: { entidad: string; real: boolean; cuando: string }[];
 };
 
-export type Health = { status: string; version: string; base_de_datos: string; ia: string };
+export type Health = { status: string; version: string; base_de_datos: string; ia: string; demo?: boolean };
 
 export function health(): Promise<Health> {
   return fetch(API_URL.replace(/\/api\/v1\/?$/, "") + "/health", { cache: "no-store" }).then((r) => r.json());

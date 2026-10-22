@@ -3,35 +3,51 @@
 import { useCallback, useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-import { Activity, AlertTriangle, CheckCircle, Database, Key, Search, Users } from "@/components/icons";
+import { Activity, AlertTriangle, CheckCircle, Database, Key, Search, ShieldCheck, Users } from "@/components/icons";
 import { Button, Card, Empty, Kpi, LevelPill, Notice, PageHeader, Skeleton } from "@/components/ui";
 import { ApiError, api, postJSON, type BancoView, type Lookup } from "@/lib/api";
 import { ago, levelOf, n, plural } from "@/lib/format";
+import { useDemo } from "@/lib/useDemo";
 import { useLive } from "@/lib/useLive";
 
 const TEAM_KEY = "desenmascara.equipo";
 const TIPOS: Record<string, string> = { telefono: "Teléfono", llave: "Llave Bre-B", cuenta: "Cuenta", enlace: "Enlace" };
 const DAY = new Intl.DateTimeFormat("es-CO", { weekday: "short", day: "numeric", timeZone: "America/Bogota" });
 
+function forgetTeamKey() {
+  try { localStorage.removeItem(TEAM_KEY); sessionStorage.removeItem(TEAM_KEY); } catch { /* storage blocked */ }
+}
+
 export default function BancoPage() {
   const load = useCallback(() => api<BancoView>("/dashboard/banco"), []);
   const { data, error, refresh } = useLive(load, 5000);
   const [teamKey, setTeamKey] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
+  const demo = useDemo();
   const [search, setSearch] = useState("");
   const [found, setFound] = useState<Lookup | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  // The team key stays in this browser until it is erased from the field.
+  // Moderation tools appear only for the team. A saved key is checked again; one that stopped working is forgotten.
   useEffect(() => {
-    try { setTeamKey(localStorage.getItem(TEAM_KEY) ?? ""); } catch { /* storage blocked: the key is asked again */ }
+    let saved = "";
+    try { saved = localStorage.getItem(TEAM_KEY) ?? sessionStorage.getItem(TEAM_KEY) ?? ""; } catch { /* storage blocked */ }
+    if (!saved) return;
+    api("/equipo/yo", { headers: { "X-Admin-Key": saved } })
+      .then(() => setTeamKey(saved))
+      .catch((e) => { if (e instanceof ApiError && e.status === 401) forgetTeamKey(); });
   }, []);
 
-  function saveKey(value: string) {
-    setTeamKey(value);
-    try {
-      if (value) localStorage.setItem(TEAM_KEY, value);
-      else localStorage.removeItem(TEAM_KEY);
-    } catch { /* storage blocked */ }
+  function signIn(key: string, remember: boolean) {
+    forgetTeamKey();
+    try { (remember ? localStorage : sessionStorage).setItem(TEAM_KEY, key); } catch { /* storage blocked */ }
+    setTeamKey(key);
+    setSigningIn(false);
+  }
+
+  function signOut() {
+    forgetTeamKey();
+    setTeamKey("");
   }
 
   async function lookup() {
@@ -52,7 +68,8 @@ export default function BancoPage() {
       setMessage(aceptar ? "Revisión aceptada: el número volvió a «sin reportes»." : "Revisión rechazada: los reportes se mantienen.");
       refresh();
     } catch (e) {
-      setMessage(e instanceof ApiError && e.status === 401 ? "Esa llave del equipo no es válida." : e instanceof Error ? e.message : "Error");
+      if (e instanceof ApiError && e.status === 401) signOut();
+      setMessage(e instanceof ApiError && e.status === 401 ? "La sesión del equipo ya no es válida: vuelve a entrar." : e instanceof Error ? e.message : "Error");
     }
   }
 
@@ -65,7 +82,7 @@ export default function BancoPage() {
       <PageHeader
         title="Banco de números"
         subtitle="La memoria de la comunidad: números, llaves Bre-B y cuentas reportados en los últimos 30 días."
-        actions={
+        actions={<>
           <form className="flex w-full gap-2 sm:w-auto" onSubmit={(e) => { e.preventDefault(); lookup(); }}>
             <div className="relative flex-1 sm:w-80">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" width={16} height={16} />
@@ -74,7 +91,15 @@ export default function BancoPage() {
             </div>
             <Button>Buscar</Button>
           </form>
-        }
+          {teamKey ? (
+            <span className="inline-flex items-center gap-2 rounded-xl border border-brand/30 bg-brand-soft px-3 py-2 text-sm font-medium text-brand-ink">
+              <ShieldCheck width={16} height={16} /> Equipo conectado
+              <button type="button" onClick={signOut} className="ml-1 text-xs font-semibold hover:underline">Salir</button>
+            </span>
+          ) : (
+            <Button type="button" variant="ghost" onClick={() => setSigningIn(true)}><Key width={16} height={16} /> Acceso del equipo</Button>
+          )}
+        </>}
       />
 
       <div className="space-y-6">
@@ -179,12 +204,15 @@ export default function BancoPage() {
                       <div className="flex justify-between gap-2"><span className="tabular font-semibold">{s.valor}</span><span className="text-xs text-muted">{ago(s.creado)}</span></div>
                       <p className="mt-1 text-muted">«{s.motivo}»</p>
                       <div className="mt-3 flex items-center gap-2">
-                        <Button onClick={() => resolve(s.id, true)} disabled={!teamKey} className="px-3 py-1.5 text-xs">Aceptar</Button>
-                        <Button variant="ghost" onClick={() => resolve(s.id, false)} disabled={!teamKey} className="px-3 py-1.5 text-xs">Rechazar</Button>
+                        {teamKey && <>
+                          <Button onClick={() => resolve(s.id, true)} className="px-3 py-1.5 text-xs">Aceptar</Button>
+                          <Button variant="ghost" onClick={() => resolve(s.id, false)} className="px-3 py-1.5 text-xs">Rechazar</Button>
+                        </>}
                         <span className="text-[11px] text-muted">escribió desde ese número</span>
                       </div>
                     </li>
                   ))}
+                  {!teamKey && <li className="text-xs text-muted">Solo el equipo de moderación puede aceptarlas o rechazarlas.</li>}
                 </ul>
               ) : <Empty icon={CheckCircle}>No hay solicitudes pendientes.</Empty>}
             </Card>
@@ -202,20 +230,70 @@ export default function BancoPage() {
                   </li>
                 ))}
               </ul>
-              <AddOfficial teamKey={teamKey} onDone={(m) => { setMessage(m); refresh(); }} />
-            </Card>
-
-            <Card title="Llave del equipo" icon={Key}>
-              <label className="block text-xs text-muted">
-                Para aceptar revisiones y agregar números oficiales (ADMIN_API_KEY del archivo .env). Queda guardada en este equipo; bórrala del campo para olvidarla.
-                <input type="password" value={teamKey} onChange={(e) => saveKey(e.target.value)} autoComplete="off" placeholder="adm_…"
-                       className="mt-2 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-4 focus:ring-brand/15" />
-              </label>
+              {teamKey
+                ? <AddOfficial teamKey={teamKey} onDone={(m) => { setMessage(m); refresh(); }} />
+                : <Button type="button" variant="ghost" onClick={() => setSigningIn(true)} className="mt-4 w-full">+ Agregar número oficial</Button>}
             </Card>
           </div>
         </div>
-        <p className="text-right text-xs text-muted">Datos de prueba ficticios marcados como «Demo» · números enmascarados</p>
+        <p className="text-right text-xs text-muted">{demo ? "Datos de demostración marcados como «Demo» · " : ""}Números enmascarados para proteger la privacidad.</p>
       </div>
+      {signingIn && <TeamSignIn onClose={() => setSigningIn(false)} onSignedIn={signIn} />}
+    </div>
+  );
+}
+
+function TeamSignIn({ onClose, onSignedIn }: { onClose: () => void; onSignedIn: (key: string, remember: boolean) => void }) {
+  const [key, setKey] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const close = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [onClose]);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/equipo/yo", { headers: { "X-Admin-Key": key } });
+      onSignedIn(key, remember);
+    } catch (e) {
+      setError(e instanceof ApiError && e.status === 401 ? "Esa llave no es válida." : e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="acceso-equipo" onClick={onClose}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); submit(); }}
+            className="rise w-full max-w-sm space-y-4 rounded-2xl border border-line bg-surface p-6 shadow-xl">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand-ink"><ShieldCheck /></span>
+          <div>
+            <h2 id="acceso-equipo" className="font-semibold">Acceso del equipo</h2>
+            <p className="text-xs text-muted">Moderación del Banco de números</p>
+          </div>
+        </div>
+        <label className="block text-sm font-medium">
+          Llave de moderación
+          <input type="password" autoFocus value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off"
+                 className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand/15" />
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-brand" />
+          Recordar en este equipo
+        </label>
+        {error && <Notice>{error}</Notice>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!key || busy}>{busy ? "Comprobando…" : "Entrar"}</Button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -227,7 +305,7 @@ function RiskCell({ row }: { row: BancoView["mas_reportados"][number] }) {
 }
 
 function AddOfficial({ teamKey, onDone }: { teamKey: string; onDone: (message: string) => void }) {
-  const [entidad, setEntidad] = useState("BancoAndino");
+  const [entidad, setEntidad] = useState("");
   const [valor, setValor] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -246,10 +324,10 @@ function AddOfficial({ teamKey, onDone }: { teamKey: string; onDone: (message: s
     <form className="mt-5 space-y-2 border-t border-line pt-4" onSubmit={(e) => { e.preventDefault(); add(); }}>
       <div className="text-xs font-semibold uppercase tracking-wide text-muted">Agregar número oficial</div>
       <div className="grid grid-cols-2 gap-2">
-        <input value={entidad} onChange={(e) => setEntidad(e.target.value)} aria-label="Entidad" className="rounded-xl border border-line bg-surface px-3 py-2 text-sm" />
+        <input value={entidad} onChange={(e) => setEntidad(e.target.value)} aria-label="Entidad" placeholder="Entidad" className="rounded-xl border border-line bg-surface px-3 py-2 text-sm" />
         <input value={valor} onChange={(e) => setValor(e.target.value)} aria-label="Número" placeholder="+57 601 000 0003" className="rounded-xl border border-line bg-surface px-3 py-2 text-sm" />
       </div>
-      <Button disabled={!teamKey || valor.length < 7} className="w-full">Agregar a la lista blanca</Button>
+      <Button disabled={!entidad || valor.length < 7} className="w-full">Agregar a la lista blanca</Button>
       <p className="text-[11px] text-muted">Solo con fuente oficial: una búsqueda en internet no basta.</p>
       {error && <p className="text-xs text-risk-high">{error}</p>}
     </form>
