@@ -444,6 +444,18 @@ El repositorio es público, así que Render lo encuentra pegando la URL `https:/
 | Dashboard | `https://desenmascara.onrender.com` |
 | Base de datos | Supabase, proyecto `Desemarcara_Bots` (West US, Oregon) |
 
+**Probarlo desde casa** (el equipo no necesita descargar el repositorio):
+
+| Qué | Cómo |
+|---|---|
+| El bot | Buscar **@Desenmascara_bot** en Telegram y escribirle «Hola» |
+| El Dashboard | Abrir `https://desenmascara.onrender.com` |
+| El Panel de la entidad | Con un acceso propio: `python scripts/crear_acceso.py "Desenmascara" --correo su@correo.com` le crea uno y muestra su contraseña una vez |
+| Llamada Verificada | Desde el Panel, registrar una llamada al número de un compañero; él pregunta al bot (opción 2 → botón **📞 Desenmascara**) y ve **SÍ, ES REAL** con el código |
+| La app de Android | Sección 19 |
+
+El repositorio solo hace falta para cambiar el código (sección 13). Cada persona usa su propio `.env`: las llaves no están en GitHub. Mientras el bot esté publicado en Render, no se arranca otro en un computador (el programa se niega solo, para no quitárselo al servidor).
+
 **Si algo falla**
 
 | Lo que ves | Por qué | Arreglo |
@@ -476,12 +488,21 @@ Una llamada de teléfono no pasa por Telegram, así que el bot no la puede ver: 
 
 No bloquea ni silencia llamadas, no lee los contactos y solo envía el número que llama. Sin el aviso automático, el bot hace lo mismo a mano: opción 3, «¿Contesto o no?».
 
-**Instalarla (Android 10 o más nuevo):**
+**Instalarla, paso a paso** (todo en el celular Android, versión 10 o más nueva):
 
-1. Descarga `desenmascara-llamadas.apk` de [Releases](https://github.com/Mik17-sr/Desenmascara/releases/latest) en el celular. GitHub la construye sola con cada cambio en `android/` (`.github/workflows/android.yml`).
-2. Ábrela y permite instalar apps de esta fuente. Android puede advertir que es una app no verificada: es normal, porque no viene de Play Store.
-3. Abre **Desenmascara**, permite las notificaciones y toca **Activar identificador**; elige Desenmascara como app de identificación de llamadas.
-4. Para probarla sin esperar una llamada: escribe un número en **Probar con un número**.
+1. **Bajar la app.** Abre este enlace en el navegador del celular y espera a que termine la descarga:
+   [`desenmascara-llamadas.apk`](https://github.com/Mik17-sr/Desenmascara/releases/latest/download/desenmascara-llamadas.apk).
+   Siempre trae la última versión. También puedes bajarla en el computador y enviártela al celular por Telegram («Mensajes guardados») o WhatsApp.
+2. **Instalarla.** Toca el archivo descargado (en las notificaciones o en **Archivos → Descargas**).
+   - Si dice «Por seguridad, tu teléfono no permite instalar apps de esta fuente»: **Configuración → Permitir de esta fuente** y vuelve atrás.
+   - Toca **Instalar**.
+   - Si aparece **Play Protect** («app no verificada»): **Más detalles → Instalar de todas formas**. Es normal: no viene de Play Store.
+3. **Activarla** (una sola vez). Abre **Desenmascara** (el escudo verde), **Permitir** las notificaciones y toca **Activar identificador** → elige **Desenmascara** → **Establecer como predeterminada**. Debe decir **✅ Activo**.
+4. **Probarla.**
+   - Sin llamada: en **Probar con un número**, escribe uno y toca **Revisar** (por ejemplo `304 472 2062`, reportado: 🟡 Cuidado). La primera vez puede tardar hasta un minuto mientras el servidor despierta.
+   - Con llamada: que alguien te llame desde un número que **no** tengas en tus contactos. Mientras suena, arriba aparece el aviso.
+
+Si un paso muestra algo distinto, envía una captura de la pantalla del celular al equipo.
 
 **Compilarla en un computador** (opcional: GitHub ya lo hace): JDK 17 y el SDK de Android (plataforma 34), y luego `cd android` y `gradlew assembleDebug`. El APK queda en `android/app/build/outputs/apk/debug/`.
 
