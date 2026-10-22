@@ -6,7 +6,8 @@
 **Versión:** 7.0 · Edición Telegram Nativo  
 **Canal Ciudadano:** Telegram Bot API ([@Desenmascara_bot](https://t.me/Desenmascara_bot))  
 **Equipo:** Luis Guillermo Nieto Patiño · Miguel · Gerhard Arce · IngBocadillo  
-**Lema:** *Reenvía el mensaje. Desenmascara la estafa. Las demás herramientas adivinan; Desenmascara confirma con la fuente.*
+**Lema:** *Reenvía el mensaje. Desenmascara la estafa. Las demás herramientas adivinan; Desenmascara confirma con la fuente.*  
+**Pitch en video (3 min):** [desenmascara.onrender.com/pitch](https://desenmascara.onrender.com/pitch/)
 
 ---
 
