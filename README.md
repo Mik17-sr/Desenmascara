@@ -375,7 +375,7 @@ El repositorio es público, así que Render lo encuentra pegando la URL `https:/
 
 **Antes de Render**
 
-1. Pasa los datos a Supabase (sección 14): el disco de Render se borra en cada despliegue y reinicio, y SQLite los perdería. Crea el proyecto en la región **us-east-1**, cerca de Render (Virginia), y guarda la cadena del **Session pooler**.
+1. Pasa los datos a Supabase (sección 14): el disco de Render se borra en cada despliegue y reinicio, y SQLite los perdería. Crea el proyecto en una región del oeste de EE. UU. (*West US*), cerca de Render (Oregon), y guarda la cadena del **Session pooler**.
 2. Copia tus datos: pon esa cadena como `DATABASE_URL` en tu `.env` y ejecuta `python scripts/migrar_a_supabase.py`.
 
 **A. La API y el bot (Web Service)**
@@ -388,14 +388,14 @@ El repositorio es público, así que Render lo encuentra pegando la URL `https:/
 | Name | `desenmascara-api` |
 | Language | Python 3 |
 | Branch | `main` |
-| Region | Virginia (US East) |
+| Region | Oregon (US West) |
 | Root Directory | (vacío) |
 | Build Command | `pip install -r requirements.txt` |
 | Start Command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 | Instance Type | Free |
 | Health Check Path (en *Advanced*) | `/health` |
 
-5. En **Environment Variables** agrega estas. Pégalas tú en Render; no las mandes por chat:
+5. En **Environment Variables** agrega estas (o todas de una vez con **Add from .env**). Pégalas tú en Render; no las mandes por chat. Sin `DATABASE_URL` la API no arranca en Render, a propósito: con SQLite los datos se borrarían en cada reinicio.
 
 | Variable | Valor |
 |---|---|

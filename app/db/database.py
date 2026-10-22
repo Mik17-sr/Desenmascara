@@ -48,6 +48,10 @@ async def init_db() -> None:
     """SQLite: create the tables that are missing. PostgreSQL/Supabase: the migrations create them, with RLS."""
     from app.db.models import Base
 
+    if IS_SQLITE and settings.RENDER:
+        # On Render's disk the data would vanish each time the free service sleeps: better not to start at all.
+        raise RuntimeError("En Render falta DATABASE_URL: pon la cadena del Session pooler de Supabase (README, sección 18). "
+                           "Con SQLite los datos se borrarían en cada reinicio.")
     async with engine.begin() as conn:
         if IS_SQLITE:
             await conn.run_sync(Base.metadata.create_all)

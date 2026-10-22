@@ -44,5 +44,7 @@ class Settings(BaseSettings):
     # Render sets RENDER_EXTERNAL_URL by itself; TELEGRAM_WEBHOOK_URL is for any other server.
     TELEGRAM_WEBHOOK_URL: Optional[str] = None
     RENDER_EXTERNAL_URL: Optional[str] = None
+    # Render sets RENDER=true. There the disk is erased on every restart, so SQLite is refused (app/db/database.py).
+    RENDER: bool = False
 
 settings = Settings()

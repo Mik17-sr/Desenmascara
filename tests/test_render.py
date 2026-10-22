@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import pytest
 import yaml
 
 from app.bot import webhook
@@ -78,3 +79,11 @@ def test_the_bot_starts_by_webhook_when_published(monkeypatch):
     url = application.bot.set_webhook.call_args.args[0]
     assert url == "https://desenmascara-api.onrender.com/telegram/webhook"
     assert application.bot.set_webhook.call_args.kwargs["secret_token"] == webhook.secret()
+
+
+def test_on_render_it_never_starts_on_a_disk_that_is_erased(monkeypatch):
+    from app.db import database
+
+    monkeypatch.setattr(settings, "RENDER", True)
+    with pytest.raises(RuntimeError, match="DATABASE_URL"):
+        asyncio.run(database.init_db())  # the tests run on SQLite

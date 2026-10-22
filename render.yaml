@@ -8,7 +8,7 @@ services:
     name: desenmascara-api
     runtime: python
     plan: free
-    region: virginia  # the closest to Colombia; create Supabase in us-east-1 (N. Virginia) too
+    region: oregon  # with the team's other services; create Supabase in a US West region too
     branch: main
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
