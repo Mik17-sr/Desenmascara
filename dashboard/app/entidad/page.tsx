@@ -44,6 +44,7 @@ export default function EntidadPage() {
   const [correo, setCorreo] = useState("");
   const [clave, setClave] = useState("");
   const [remember, setRemember] = useState(true);
+  const [showClave, setShowClave] = useState(false);
   const [session, setSession] = useState<Sesion | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
@@ -119,7 +120,12 @@ export default function EntidadPage() {
               Contraseña
               <div className="relative">
                 <Key className="pointer-events-none absolute left-3 top-[60%] -translate-y-1/2 text-muted" width={16} height={16} />
-                <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="current-password" className={`${INPUT} pl-9`} />
+                <input type={showClave ? "text" : "password"} value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="current-password"
+                       className={`${INPUT} pl-9 pr-20`} />
+                <button type="button" onClick={() => setShowClave(!showClave)} aria-pressed={showClave}
+                        className="absolute right-2 top-[60%] -translate-y-1/2 rounded-md px-2 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-soft">
+                  {showClave ? "Ocultar" : "Mostrar"}
+                </button>
               </div>
             </label>
             <label className="flex items-center gap-2 text-sm">
@@ -128,9 +134,13 @@ export default function EntidadPage() {
             </label>
             <Button disabled={!correo || !clave || busy} className="w-full py-2.5">{busy ? "Entrando…" : "Entrar al panel"}</Button>
             {error && <Notice>{error}</Notice>}
-            <p className="text-xs text-muted">{demo
-              ? "Demostración: python scripts/seed_demo.py muestra el correo y la contraseña de BancoAndino (entidad ficticia)."
-              : "El correo y la contraseña te los entrega el equipo de Desenmascara cuando conecta tu entidad a Llamada Verificada."}</p>
+            {demo
+              ? <p className="text-xs text-muted">Demostración: python scripts/seed_demo.py muestra el correo y la contraseña de BancoAndino (entidad ficticia).</p>
+              : <div className="space-y-2 border-t border-line pt-3 text-xs text-muted">
+                  <p>Cada persona de tu equipo entra con <span className="font-medium text-ink">su propio correo y contraseña</span>: nadie comparte la clave, y un acceso se puede retirar sin tocar los demás.</p>
+                  <p>¿Necesitas un acceso o perdiste tu contraseña? Pídeselo al equipo de Desenmascara.</p>
+                  <p className="flex items-center gap-1.5"><ShieldCheck width={14} height={14} /> Conexión cifrada. Guardamos solo una huella de tu contraseña, nunca la contraseña.</p>
+                </div>}
           </form>
         </Card>
       </div>

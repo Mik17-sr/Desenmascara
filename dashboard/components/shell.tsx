@@ -112,7 +112,10 @@ function SystemStatus() {
   const rows = [
     { label: "API", ok: !!up, text: up ? "en línea" : state === "down" ? "sin conexión" : "…" },
     { label: "Base de datos", ok: up && state.base_de_datos === "ok", text: up ? (state.base_de_datos === "ok" ? (supabase ? "Supabase" : "lista") : "falla") : "—" },
-    { label: "IA local", ok: up && state.ia === "ok", text: up ? (state.ia === "ok" ? "lista" : "no disponible") : "—" },
+    // On the server the AI is off on purpose ("apagada"): the rules answer, so it is a mode, not a failure.
+    up && state.ia === "apagada"
+      ? { label: "Análisis", ok: true, text: "reglas verificadas" }
+      : { label: "IA local", ok: up && state.ia === "ok", text: up ? (state.ia === "ok" ? "lista" : "no disponible") : "—" },
     { label: "Tiempo real", ok: !supabase || realtime === "live", text: !supabase ? "cada 3 s" : realtime === "live" ? "Realtime" : realtime === "error" ? "sin conexión" : "conectando" },
   ];
   return (

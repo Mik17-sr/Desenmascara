@@ -280,6 +280,8 @@ Para mostrarlo a una empresa sin nada ficticio:
 ```powershell
 python scripts/limpiar_datos.py --todo   # quita BancoAndino, Tienda Ejemplo, los usuarios «Demo» y la actividad de prueba
 python scripts/crear_entidad.py "Nombre de la entidad" --correo panel@entidad.com --dominio entidad.com --linea "+57 601 000 0000"   # la conecta y muestra su contraseña
+python scripts/crear_acceso.py "Nombre de la entidad" --correo otra.persona@entidad.com   # otra persona del equipo, con su propia contraseña
+python scripts/crear_acceso.py "Nombre de la entidad" --lista                             # quién entra; --quitar retira un acceso
 ```
 
 - `datasets/dominios_oficiales.csv`: páginas oficiales de 27 entidades reales (bancos, DIAN, Policía, mensajerías). Con ellas, un enlace a `bancolombia.com` es oficial y `bancolombia-seguro.co` es una imitación.
