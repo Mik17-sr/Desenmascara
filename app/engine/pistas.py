@@ -9,7 +9,7 @@ from app.core.security import normalize_phone
 
 _TLDS = r"(?:com\.co|gov\.co|org\.co|net\.co|edu\.co|com|co|net|org|info|xyz|site|online|top|app|link|shop|store|club|live|me|io|ly|lat|vip)"
 URL_PATTERN = re.compile(
-    r"(?i)\b(?:https?://|www\.)[^\s<>\"']+"
+    r"(?i)(?:https?://|\bwww\.)[^\s<>\"']+"  # no \b before "http": OCR glues it to the word before ("WhatsApphttps://")
     rf"|(?<![@\w.-])(?:[a-z0-9](?:[a-z0-9-]{{0,61}}[a-z0-9])?\.)+{_TLDS}\b(?:/[^\s<>\"']*)?"
 )
 PHONE_PATTERN = re.compile(r"(?<![\d$])(?:\+?57[\s.-]?)?(?:3\d{2}|60\d)[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)")
@@ -75,6 +75,9 @@ FAMILY_SQUASHED = ("mama", "mami", "papa", "papi", "abuel", "hermano", "hermana"
 # Link shorteners hide where a link goes.
 SHORTENERS = {"bit.ly", "bitly.com", "wa.link", "ma.sv", "tinyurl.com", "cutt.ly", "t.ly", "is.gd", "rebrand.ly",
               "shorturl.at", "acortar.link", "rb.gy", "tiny.cc", "ow.ly", "s.id"}
+# Links that open a chat with whoever sent the message, and the words that ask to write or call them.
+CHAT_LINKS = {"wa.me", "wa.link", "api.whatsapp.com", "t.me", "telegram.me"}
+CONTACT_WORDS = ("whatsapp", "escribenos", "escribanos", "llamanosal", "llamenosal", "contactenos", "contactanos", "llamaya")
 # ".col.cuctly.cc/": a domain written with a leading dot so that filters do not turn it into a link.
 DISGUISED_LINK = re.compile(r"(?i)(?<![\w/.:@-])\.([a-z0-9-]+(?:\.[a-z0-9-]+)+)/?")
 
@@ -105,6 +108,8 @@ class Pistas:
     acortados: list[str] = field(default_factory=list)
     enlace_disfrazado: bool = False
     menciona_familia: bool = False
+    # A way to pay or talk that came inside the message: a shortened or disguised link, a chat link or a payment reference.
+    canal_del_mensaje: bool = False
 
 
 def squash(text: str) -> str:
@@ -161,6 +166,7 @@ def extract(text: str, entity_names: list[str] | None = None) -> Pistas:
     # The warning itself contains "compartas", so it is removed before looking for requests.
     asks_back = ASKS_BACK.search(CODE_WARNING.sub(" ", lowered))
     hosts = [(urlsplit(u).hostname or "").removeprefix("www.") for u in urls]
+    patrones = find_patterns(squashed)
     return Pistas(
         urls=urls,
         telefonos=list(dict.fromkeys(phones)),
@@ -172,8 +178,10 @@ def extract(text: str, entity_names: list[str] | None = None) -> Pistas:
         urgencia=[w for w in URGENCY_WORDS if w in lowered or w.replace(" ", "") in squashed],
         aviso_de_codigo=(bool(codigos) and bool(CODE_WARNING.search(lowered) or CODE_DELIVERY.search(lowered))
                          and not asks_back and not urls),
-        patrones=find_patterns(squashed),
+        patrones=patrones,
         acortados=[h for h in hosts if h in SHORTENERS],
         enlace_disfrazado=bool(disguised),
         menciona_familia=bool(FAMILY_WORDS & set(re.findall(r"\w+", lowered))) or any(w in squashed for w in FAMILY_SQUASHED),
+        canal_del_mensaje=(bool(disguised) or "pago_referencia" in patrones or bool(phones) or any(h in SHORTENERS | CHAT_LINKS for h in hosts)
+                           or any(w in squashed for w in CONTACT_WORDS)),
     )

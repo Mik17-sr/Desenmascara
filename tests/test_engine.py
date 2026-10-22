@@ -87,7 +87,7 @@ def test_real_entities_official_websites():
 
 def test_real_cases_with_rules_alone():
     """datasets/casos_reales.csv: real messages. Even without the AI, the rules must catch every scam,
-    send every doubtful collection to "verify first" and leave the legitimate ones low."""
+    including the collections that ask to pay through their own link, and leave the legitimate ones low."""
     official = {name: list(sites) for name, sites in official_websites().items()}
     want = {"si": {RiskLevel.HIGH, RiskLevel.MEDIUM}, "dudoso": {RiskLevel.HIGH, RiskLevel.MEDIUM}, "no": {RiskLevel.LOW}}
     with open(REAL_CASES, encoding="utf-8") as rows:
@@ -96,6 +96,8 @@ def test_real_cases_with_rules_alone():
             links = [check_link(u, official, found.entidades) for u in found.urls]
             result = judge(Evidencia(tipo="mensaje", pistas=found, links=links, ages={}, psicologia=None, ia_consultada=False))
             assert result.risk_level in want[row["es_estafa"]], (row["id"], result.risk_level, result.risk_score)
+            if row["modalidad"] == "cobro_falso":  # the team's call: it asks to pay or write through the message's own channel
+                assert result.risk_level == RiskLevel.HIGH and result.category == "Posible cobranza falsa", (row["id"], result.risk_score)
 
 
 def test_patterns_survive_ocr_without_spaces():
@@ -103,6 +105,12 @@ def test_patterns_survive_ocr_without_spaces():
     assert "falso_familiar" in extract(ocr).patrones
     assert extract("Ingresa: .col.cuctly.cc/.").enlace_disfrazado
     assert "amenaza_cobro" not in extract("Sin embargo, te recordamos que tu pago fue recibido. Gracias.").patrones
+    # The team's Credivalores screenshot as the OCR read it: the link glued to "WhatsApp" and "bit.ly" misread.
+    ocr_collection = ("tienesuna deudaentuCREDIVALORESde 943.890,paga solo 533.248 yquedaapazysalvoo saldo pendiente."
+                      "Escribenos al WhatsApphttps://bit.lyl. 4v6818L. o llamanos al 0.")
+    found = extract(ocr_collection)
+    result = judge(Evidencia(tipo="mensaje", pistas=found, links=[], ages={}, psicologia=None, ia_consultada=False))
+    assert result.risk_level == RiskLevel.HIGH and result.category == "Posible cobranza falsa"
 
 
 def test_a_code_that_is_only_delivered_is_a_notice():

@@ -44,8 +44,8 @@ VERIFICA_LA_DEUDA = ("Antes de pagar, verifica la deuda con la empresa original 
 # Deterministic patterns from Pistas (real cases in datasets/casos_reales.csv) -> modalidad. The ones in
 # PATRON_ALTO are specific enough to be high risk on their own; the false relative stays "sospechoso".
 PATRON_MODALIDAD = {"falso_familiar": "falso_familiar", "robo_de_cuenta": "robo_de_cuenta", "falsa_multa": "falso_funcionario",
-                    "falso_empleo": "falso_empleo", "phishing": "suplantacion_bancaria"}
-PATRON_ALTO = {"robo_de_cuenta", "falsa_multa", "falso_empleo", "phishing"}
+                    "falso_empleo": "falso_empleo", "phishing": "suplantacion_bancaria", "cobro_falso": "cobro_falso"}
+PATRON_ALTO = {"robo_de_cuenta", "falsa_multa", "falso_empleo", "phishing", "cobro_falso"}
 P_PIDE ={"codigo_o_clave": 35, "instalar_app": 30, "mover_dinero": 30, "dinero": 20, "datos_personales": 20, "abrir_enlace": 10}
 # The false relative stays "sospechoso" (the guide's case 2): the Círculo confirms it with the real person.
 STRONG_MODALIDADES = {"suplantacion_bancaria", "falso_asesor", "falsa_compra", "paquete_retenido", "falso_funcionario",
@@ -82,6 +82,10 @@ MODALIDADES = {
                      "No envíes datos ni pagues para reclamar nada: los premios reales no piden pagos ni códigos."),
     "falso_empleo": ("Falso empleo", "Ofrece un trabajo fácil a cambio de pagos o documentos.",
                      "No pagues por un empleo ni envíes documentos a desconocidos."),
+    "cobro_falso": ("Posible cobranza falsa",
+                    "Cobra una deuda con descuento o amenazas y pide pagar o escribir por un canal que vino en el mismo mensaje.",
+                    "No pagues ni escribas por los enlaces, números o referencias del mensaje. Si crees que tienes una deuda, "
+                    "búscala tú en la página oficial de la empresa."),
     "robo_de_cuenta": ("Robo de cuenta", "Se hace pasar por el soporte de WhatsApp u otra app para quedarse con tu cuenta.",
                        "No respondas ni compartas códigos: WhatsApp nunca te escribe desde un número común. Activa la verificación en dos pasos."),
     "otra": ("Posible estafa", "Tiene señales típicas de una estafa.", ""),
@@ -165,6 +169,9 @@ def judge(e: Evidencia) -> AnalysisResult:
             "Frases como «ignora tus instrucciones»", SignalSource.JUEZ, P_INYECCION)
 
     patron = next((name for name in e.pistas.patrones if name in PATRON_MODALIDAD), None)
+    cobro = any(name in e.pistas.patrones for name in COBRO_DUDOSO)
+    if patron is None and cobro and e.pistas.canal_del_mensaje:
+        patron = "cobro_falso"  # the team's call on real cases: a collection that asks to pay or write through its own link
     imita = None
     for check in e.links:
         recognized.append(f"Enlace: {check.dominio}")
@@ -276,7 +283,6 @@ def judge(e: Evidencia) -> AnalysisResult:
         score = max(score, 75)  # rule: a pattern of real scams: account theft, fake fine, easy-money job, phishing
     if patron == "falso_familiar":
         score = max(score, 45)  # rule: the false relative is "sospechoso" until the Círculo confirms it
-    cobro = any(name in e.pistas.patrones for name in COBRO_DUDOSO)
     if cobro:
         score = max(score, 40)  # rule: an unrequested collection with threats or discounts is verified before paying
     if aviso_de_codigo and not banco_alto and not e.inyeccion:
