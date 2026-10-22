@@ -96,6 +96,17 @@ class Entidad(Base):
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class AccesoEntidad(Base):
+    """E-mail and password for the entity panel. The API key stays for integrations."""
+    __tablename__ = "accesos_entidad"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    entidad_id: Mapped[UUID] = mapped_column(ForeignKey("entidades.id", ondelete="CASCADE"), index=True)
+    correo: Mapped[str] = mapped_column(String(120), unique=True)
+    clave_hash: Mapped[str] = mapped_column(String(200))
+    creado_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class LlamadaRegistrada(Base):
     __tablename__ = "llamadas_registradas"
 

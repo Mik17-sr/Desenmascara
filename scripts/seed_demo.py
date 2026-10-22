@@ -18,7 +18,7 @@ from sqlalchemy import select  # noqa: E402
 
 from app.core.security import encrypt, hash_api_key, new_api_key  # noqa: E402
 from app.db.database import SessionLocal, init_db  # noqa: E402
-from app.db.models import Usuario  # noqa: E402
+from app.db.models import AccesoEntidad, Usuario  # noqa: E402
 from app.services import banco, demo, entidades  # noqa: E402
 from app.services.entidades import panel_link  # noqa: E402
 
@@ -63,6 +63,9 @@ async def main(rotate: bool) -> None:
             else:
                 print(f"{nombre} ya existía (su llave no se vuelve a mostrar; usa --nueva-llave).")
             await banco.add_official(db, entidad, "telefono", oficial, "telegram", "registro", nombre)
+            correo = f"panel@{nombre.lower().replace(' ', '')}.test"  # .test is reserved: never a real company's mail
+            if not await db.scalar(select(AccesoEntidad).where(AccesoEntidad.entidad_id == entidad.id)):
+                print(f"  Panel de {nombre}: correo {correo} · contraseña {await entidades.add_access(db, entidad, correo)}")
 
         for tipo, valor, modalidad, people, red in REPORTADOS:
             for user in demo_users[:people]:

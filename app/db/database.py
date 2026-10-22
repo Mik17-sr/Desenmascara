@@ -41,11 +41,11 @@ if IS_SQLITE:
         cursor.close()
 
 
-MIGRATION = "supabase/migrations/20261021120000_esquema_inicial.sql"
+MIGRATION = "las migraciones de supabase/migrations, en orden"
 
 
 async def init_db() -> None:
-    """SQLite: create the 12 tables. PostgreSQL/Supabase: the migration creates them, with RLS."""
+    """SQLite: create the tables that are missing. PostgreSQL/Supabase: the migrations create them, with RLS."""
     from app.db.models import Base
 
     async with engine.begin() as conn:

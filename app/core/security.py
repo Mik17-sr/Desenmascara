@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import re
 import secrets
+import time
 
 from cryptography.fernet import Fernet
 from fastapi import Header, HTTPException
@@ -39,6 +40,48 @@ def hash_api_key(key: str) -> str:
 
 def new_api_key() -> str:
     return "sec_live_" + secrets.token_urlsafe(24)
+
+
+# Entity panel sign-in: e-mail and password. scrypt makes each guess slow; only the hash is stored.
+_SCRYPT = {"n": 2**14, "r": 8, "p": 1, "dklen": 32}
+
+
+def new_password() -> str:
+    return secrets.token_urlsafe(9)
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    return f"scrypt${salt.hex()}${hashlib.scrypt(password.encode(), salt=salt, **_SCRYPT).hex()}"
+
+
+def password_matches(password: str, stored: str) -> bool:
+    try:
+        _, salt, digest = stored.split("$")
+        candidate = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), **_SCRYPT).hex()
+    except ValueError:
+        return False
+    return hmac.compare_digest(candidate, digest)
+
+
+def new_session(entity_id: str, hours: int) -> str:
+    """A signed panel session: 'ses_<entity>.<expiry>.<signature>'. Nothing is stored server-side."""
+    payload = f"{entity_id}.{int(time.time()) + hours * 3600}"
+    return f"ses_{payload}.{_session_signature(payload)}"
+
+
+def session_entity_id(token: str) -> str | None:
+    """The entity of a valid, unexpired session; None for anything else."""
+    try:
+        entity_id, expires, signature = token.removeprefix("ses_").split(".")
+        valid = token.startswith("ses_") and int(expires) > time.time()
+    except ValueError:
+        return None
+    return entity_id if valid and hmac.compare_digest(signature, _session_signature(f"{entity_id}.{expires}")) else None
+
+
+def _session_signature(payload: str) -> str:
+    return hmac.new(_secret("HMAC_SECRET").encode(), b"panel-entidad:" + payload.encode(), hashlib.sha256).hexdigest()
 
 
 def normalize_phone(raw: str) -> str | None:

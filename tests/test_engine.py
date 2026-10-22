@@ -112,6 +112,15 @@ def test_a_code_that_is_only_delivered_is_a_notice():
     assert ask.risk_level == RiskLevel.HIGH
 
 
+def test_passwords_and_panel_sessions():
+    from app.core.security import hash_password, new_session, password_matches, session_entity_id
+    stored = hash_password("clave-segura")
+    assert "clave-segura" not in stored and password_matches("clave-segura", stored) and not password_matches("otra", stored)
+    assert session_entity_id(new_session("abc", hours=1)) == "abc"
+    assert session_entity_id(new_session("abc", hours=-1)) is None  # expired
+    assert session_entity_id("ses_abc.9999999999.firma-falsa") is None
+
+
 def test_published_official_lines_load():
     lines = official_lines()
     assert lines["576013430000"].entidad == "Bancolombia" and lines["576013430000"].sitio == "bancolombia.com"

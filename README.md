@@ -212,7 +212,7 @@ Esta versión implementa la guía del proyecto (`docs/`, v7.0) con tres cambios:
 | La guía dice | Aquí | Por qué |
 |---|---|---|
 | WhatsApp con Twilio | **Telegram** | Ya existía el bot; no hace falta sandbox ni cuenta de Twilio. Como un bot de Telegram no puede escribir primero, el Círculo usa enlaces de invitación. |
-| Supabase (PostgreSQL + pgvector) | **SQLite local o Supabase**, con las mismas 12 tablas | En local funciona sin cuentas. Con Supabase hay RLS y Realtime (ver sección 14). Las huellas de campañas son MinHash en JSON en lugar de pgvector. |
+| Supabase (PostgreSQL + pgvector) | **SQLite local o Supabase**, con las 12 tablas de la guía y una más para el acceso de las entidades | En local funciona sin cuentas. Con Supabase hay RLS y Realtime (ver sección 14). Las huellas de campañas son MinHash en JSON en lugar de pgvector. |
 | LLM por API (Claude, GPT o Gemini) | **llama3.2 local con Ollama** | Sin claves ni costo. En CPU tarda 5-7 s por análisis, así que la IA solo clasifica y el juez arma la explicación. |
 
 ---
@@ -267,7 +267,7 @@ npm run build
 npm run start                        # http://localhost:3000
 ```
 
-- La llave de la entidad para el Panel la muestra `seed_demo.py` (o `--nueva-llave` para generar otra).
+- Las entidades entran al Panel con **correo y contraseña**: los muestra `seed_demo.py` para la demostración, o `crear_entidad.py` para una entidad real. La llave de acceso (API key) queda solo para integraciones.
 - La llave del equipo (revisiones y lista blanca) es `ADMIN_API_KEY` de `.env`.
 - Documentación de la API: http://127.0.0.1:8000/docs
 
@@ -277,7 +277,7 @@ Para mostrarlo a una empresa sin nada ficticio:
 
 ```powershell
 python scripts/limpiar_datos.py --todo   # quita BancoAndino, Tienda Ejemplo, los usuarios «Demo» y la actividad de prueba
-python scripts/crear_entidad.py "Nombre de la entidad" --dominio entidad.com --linea "+57 601 000 0000"   # la conecta a Llamada Verificada
+python scripts/crear_entidad.py "Nombre de la entidad" --correo panel@entidad.com --dominio entidad.com --linea "+57 601 000 0000"   # la conecta y muestra su contraseña
 ```
 
 - `datasets/dominios_oficiales.csv`: páginas oficiales de 27 entidades reales (bancos, DIAN, Policía, mensajerías). Con ellas, un enlace a `bancolombia.com` es oficial y `bancolombia-seguro.co` es una imitación.
@@ -289,7 +289,7 @@ python scripts/crear_entidad.py "Nombre de la entidad" --dominio entidad.com --l
 ## 14. Pasar a Supabase (RLS y Realtime)
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En **SQL Editor**, pega y ejecuta `supabase/migrations/20261021120000_esquema_inicial.sql` (o `supabase db push` con la CLI). Crea las 12 tablas con RLS, las 5 vistas anónimas y la tabla `eventos_dashboard`, que ya queda publicada en Realtime.
+2. En **SQL Editor**, pega y ejecuta en orden `supabase/migrations/20261021120000_esquema_inicial.sql` y `supabase/migrations/20261022120000_accesos_entidad.sql` (o `supabase db push` con la CLI). Crean las tablas con RLS, las 5 vistas anónimas y la tabla `eventos_dashboard`, que ya queda publicada en Realtime.
 3. En **Project Settings → Database → Connection string**, copia la de **Session pooler** (funciona con IPv4) y ponla en `.env`:
    `DATABASE_URL=postgresql://postgres.<proyecto>:<contraseña>@aws-0-<región>.pooler.supabase.com:5432/postgres`
 4. Copia tus datos locales (opcional): `python scripts/migrar_a_supabase.py`. Usa los mismos `HMAC_SECRET` y `ENCRYPTION_KEY`.
@@ -343,7 +343,7 @@ El modelo de 1B es más rápido, pero deja pasar 9 de las 14 estafas: nos quedam
 | Enlaces y SSRF | Los enlaces nunca se abren: solo se compara el nombre y se consulta RDAP en un host fijo, con tiempo límite. Con llave (`GOOGLE_SAFE_BROWSING_KEY`, `URLHAUS_AUTH_KEY`), el texto del enlace se busca en Safe Browsing y URLhaus, también en hosts fijos. |
 | Rate limiting | 20 consultas por minuto por IP en lo público y 12 por persona en el bot. |
 | Secretos | En `.env` (ignorado por git), generados por `setup_local.py`. Falta gitleaks en CI. |
-| Acceso a datos | RLS en las 13 tablas de Supabase y permisos revocados a `anon`/`authenticated`; el Dashboard solo lee agregados anónimos; entidades con llave (guardada como hash). |
+| Acceso a datos | RLS en las 14 tablas de Supabase y permisos revocados a `anon`/`authenticated`; el Dashboard solo lee agregados anónimos; entidades con correo y contraseña (scrypt, con límite de intentos) y sesión firmada; la llave de integración se guarda como hash. |
 | Cifrado | Teléfonos, llaves e ids de Telegram como HMAC-SHA256; códigos y chats cifrados (Fernet). Falta TLS al desplegar. |
 | Datos personales | Se borran nombres, números y cuentas antes de guardar; audios en memoria; `/borrar` elimina a la persona. |
 | Envenenamiento | Un voto por persona y valor, reportes viejos a la mitad, revisión por el dueño. |

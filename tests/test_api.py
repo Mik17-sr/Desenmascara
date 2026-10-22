@@ -21,6 +21,29 @@ def test_health(client):
     assert body["base_de_datos"] == "ok" and body["ia"] == "no disponible" and isinstance(body["demo"], bool)
 
 
+def test_entity_signs_in_with_email_and_password(client):
+    created = client.post("/api/v1/entidades", headers=ADMIN, json={"nombre": "Tienda Prueba", "tipo": "tienda", "correo": "Panel@Tienda.test"}).json()
+    assert created["correo"] == "panel@tienda.test" and created["clave"]
+    assert client.post("/api/v1/entidad/ingresar", json={"correo": "panel@tienda.test", "clave": "otra"}).status_code == 401
+    assert client.post("/api/v1/entidad/ingresar", json={"correo": "nadie@tienda.test", "clave": created["clave"]}).status_code == 401
+
+    signed = client.post("/api/v1/entidad/ingresar", json={"correo": " PANEL@tienda.test ", "clave": created["clave"]}).json()
+    assert signed["nombre"] == "Tienda Prueba" and signed["vence_en_horas"] == 12
+    bearer = {"Authorization": f"Bearer {signed['token']}"}
+    assert client.get("/api/v1/entidad/yo", headers=bearer).json()["nombre"] == "Tienda Prueba"
+    forged = {"Authorization": "Bearer " + signed["token"][:-4] + "0000"}
+    assert client.get("/api/v1/entidad/yo", headers=forged).status_code == 401
+
+    # A sign-in link carries the API key: the panel swaps it for a session and never keeps it.
+    swapped = client.post("/api/v1/entidad/sesion", json={"recordar": True}, headers={"X-Entity-API-Key": created["api_key"]}).json()
+    assert swapped["vence_en_horas"] == 720
+    assert client.get("/api/v1/entidad/yo", headers={"Authorization": f"Bearer {swapped['token']}"}).status_code == 200
+    # The browser asks first whether the Dashboard may send the session header.
+    preflight = client.options("/api/v1/entidad/yo", headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET",
+                                                             "Access-Control-Request-Headers": "authorization"})
+    assert preflight.status_code == 200
+
+
 def test_team_key_check(client):
     assert client.get("/api/v1/equipo/yo", headers=ADMIN).json() == {"equipo": True}
     assert client.get("/api/v1/equipo/yo", headers={"X-Admin-Key": "otra"}).status_code == 401

@@ -25,6 +25,7 @@ class EntidadIn(BaseModel):
     tipo: str = Field("banco", pattern=r"^(banco|tienda|operador|publica)$")
     dominio_oficial: str | None = None
     lineas_oficiales: list[str] = Field(default_factory=list)
+    correo: str | None = Field(None, min_length=5, max_length=120, description="Para entrar al Panel con correo y contraseña")
 
 
 @router.post("/entidades")
@@ -32,7 +33,10 @@ async def create_entity(body: EntidadIn, db: AsyncSession = Depends(session)) ->
     if await entidades.by_name(db, body.nombre):
         raise HTTPException(status_code=409, detail="Esa entidad ya existe.")
     entidad, key = await entidades.create(db, body.nombre, body.tipo, body.dominio_oficial, body.lineas_oficiales)
-    return {"nombre": entidad.nombre, "api_key": key, "aviso": "Guarda la llave: no se vuelve a mostrar."}
+    answer = {"nombre": entidad.nombre, "api_key": key, "aviso": "Guarda la llave y la contraseña: no se vuelven a mostrar."}
+    if body.correo:
+        answer |= {"correo": body.correo.strip().lower(), "clave": await entidades.add_access(db, entidad, body.correo)}
+    return answer
 
 
 class ListaBlancaIn(BaseModel):

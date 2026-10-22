@@ -1,4 +1,5 @@
-"""Panel de la entidad: banks and stores register their calls and official numbers with their API key."""
+"""Panel de la entidad: banks and stores sign in with e-mail and password to register their calls and
+official numbers. Integrations send their API key instead."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -6,8 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.analysis import normalize_value
 from app.api.deps import require_entity, session
+from app.core.ratelimit import limit_by_ip
+from app.core.security import new_session
 from app.db.models import Entidad
-from app.services import banco, llamadas
+from app.services import banco, entidades, llamadas
 
 router = APIRouter()
 
@@ -16,6 +19,40 @@ class RegistrarIn(BaseModel):
     telefono_cliente: str = Field(..., min_length=7, max_length=20)
     motivo: str = Field(..., min_length=3, max_length=120)
     asesor: str = Field(..., min_length=2, max_length=60)
+
+
+SESSION_HOURS = 12
+REMEMBERED_HOURS = 30 * 24  # "Recordar en este equipo"
+
+
+class IngresarIn(BaseModel):
+    correo: str = Field(..., min_length=5, max_length=120)
+    clave: str = Field(..., min_length=1, max_length=200)
+    recordar: bool = False
+
+
+class SesionIn(BaseModel):
+    recordar: bool = True
+
+
+def _session(entidad: Entidad, remember: bool) -> dict:
+    hours = REMEMBERED_HOURS if remember else SESSION_HOURS
+    return {"token": new_session(str(entidad.id), hours), "nombre": entidad.nombre, "vence_en_horas": hours}
+
+
+@router.post("/entidad/ingresar", dependencies=[Depends(limit_by_ip)])
+async def sign_in(body: IngresarIn, db: AsyncSession = Depends(session)) -> dict:
+    """The panel's sign-in. Same answer for an unknown e-mail and a wrong password; tries are limited per IP."""
+    entidad = await entidades.by_login(db, body.correo, body.clave)
+    if entidad is None:
+        raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos.")
+    return _session(entidad, body.recordar)
+
+
+@router.post("/entidad/sesion")
+async def session_from_key(body: SesionIn, entidad: Entidad = Depends(require_entity)) -> dict:
+    """Swaps the API key (sign-in links, integrations) for a panel session, so the panel never keeps the key."""
+    return _session(entidad, body.recordar)
 
 
 @router.get("/entidad/yo")

@@ -55,7 +55,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.DASHBOARD_ORIGINS.split(",") if o.strip()],
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-Entity-API-Key", "X-Admin-Key"],
+    allow_headers=["Content-Type", "Authorization", "X-Entity-API-Key", "X-Admin-Key"],  # Authorization: the panel session
 )
 app.include_router(api_router, prefix=settings.API_V1_STR)
 

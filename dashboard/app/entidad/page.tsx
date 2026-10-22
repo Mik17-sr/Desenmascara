@@ -9,64 +9,89 @@ import { ago } from "@/lib/format";
 import { useDemo } from "@/lib/useDemo";
 import { useLive } from "@/lib/useLive";
 
-const KEY = "desenmascara.entidad";
+const KEY = "desenmascara.entidad"; // the panel session, never the API key
 const TTL_MS = 15 * 60 * 1000;
 const ESTADOS: Record<string, { label: string; className: string }> = {
   registrada: { label: "Esperando al cliente", className: "bg-risk-mid-bg text-risk-mid-ink" },
   confirmada: { label: "Verificada por el cliente", className: "bg-risk-low-bg text-risk-low" },
   vencida: { label: "Vencida (no preguntó)", className: "bg-surface-2 text-muted" },
 };
+const INPUT = "mt-1.5 w-full rounded-xl border border-line bg-surface py-2.5 pr-3 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand/15";
 
 type Registro = { codigo_verificacion: string; vence_at: string };
+type Sesion = { token: string; nombre: string };
 
-// "Recordar en este equipo" keeps the key in localStorage until "Cerrar sesión"; otherwise it lasts
-// only while the tab is open. Storage can be blocked: then the key is simply asked again.
-function savedKey(): string {
-  try { return localStorage.getItem(KEY) ?? sessionStorage.getItem(KEY) ?? ""; } catch { return ""; }
+// "Recordar en este equipo" keeps the session in localStorage (30 days) until "Cerrar sesión"; otherwise it
+// lasts while the tab is open (12 hours at most). Storage can be blocked: then the entity signs in again.
+function savedSession(): { value: string; remembered: boolean } {
+  try {
+    const kept = localStorage.getItem(KEY);
+    return kept ? { value: kept, remembered: true } : { value: sessionStorage.getItem(KEY) ?? "", remembered: false };
+  } catch {
+    return { value: "", remembered: false };
+  }
 }
-function forgetKey() {
+function forgetSession() {
   try { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); } catch { /* storage blocked */ }
 }
-function keepKey(value: string, remember: boolean) {
-  forgetKey();
-  try { (remember ? localStorage : sessionStorage).setItem(KEY, value); } catch { /* storage blocked */ }
+function keepSession(token: string, remember: boolean) {
+  forgetSession();
+  try { (remember ? localStorage : sessionStorage).setItem(KEY, token); } catch { /* storage blocked */ }
 }
+const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 export default function EntidadPage() {
-  const [key, setKey] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [clave, setClave] = useState("");
   const [remember, setRemember] = useState(true);
-  const [entity, setEntity] = useState<{ nombre: string } | null>(null);
+  const [session, setSession] = useState<Sesion | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
+  const [busy, setBusy] = useState(false);
   const demo = useDemo();
 
-  const login = useCallback(async (candidate: string, keep: boolean) => {
-    setError(null);
-    try {
-      const me = await api<{ nombre: string }>("/entidad/yo", { headers: { "X-Entity-API-Key": candidate } });
-      setEntity(me);
-      setKey(candidate);
-      keepKey(candidate, keep);
-    } catch (e) {
-      setEntity(null);
-      if (e instanceof ApiError && e.status === 401) forgetKey();
-      setError(e instanceof ApiError && e.status === 401 ? "Esa llave de acceso no es válida." : e instanceof Error ? e.message : "Error");
-    }
+  const start = useCallback((s: Sesion, keep: boolean) => {
+    keepSession(s.token, keep);
+    setSession(s);
   }, []);
 
+  async function signIn() {
+    setError(null);
+    setBusy(true);
+    try {
+      start(await postJSON<Sesion>("/entidad/ingresar", { correo, clave, recordar: remember }), remember);
+      setClave("");
+    } catch (e) {
+      setError(e instanceof ApiError && e.status === 401 ? "Correo o contraseña incorrectos."
+        : e instanceof ApiError && e.status === 429 ? "Demasiados intentos. Espera un minuto e inténtalo de nuevo."
+        : e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
-    // seed_demo.py prints /entidad#llave=…: sign in from the link and take the key out of the address bar.
+    // A sign-in link (/entidad#llave=…, printed by crear_entidad.py or seed_demo.py) carries the API key: it is
+    // swapped for a session and taken out of the address bar. A key remembered by an older version is swapped too.
     const fromLink = new URLSearchParams(window.location.hash.slice(1)).get("llave");
     if (fromLink) history.replaceState(null, "", window.location.pathname);
-    let remembered = !!fromLink;
-    if (!fromLink) try { remembered = localStorage.getItem(KEY) !== null; } catch { /* storage blocked */ }
-    const candidate = fromLink ?? savedKey();
-    if (candidate) login(candidate, remembered).finally(() => setChecking(false));
-    else setChecking(false);
-  }, [login]);
+    const saved = savedSession();
+    const restore = async () => {
+      const key = fromLink ?? (saved.value.startsWith("sec_live_") ? saved.value : null);
+      if (key) {
+        start(await postJSON<Sesion>("/entidad/sesion", { recordar: true }, { "X-Entity-API-Key": key }), fromLink ? true : saved.remembered);
+      } else if (saved.value) {
+        const me = await api<{ nombre: string }>("/entidad/yo", { headers: bearer(saved.value) });
+        setSession({ token: saved.value, nombre: me.nombre });
+      }
+    };
+    restore()
+      .catch((e) => { if (e instanceof ApiError && e.status === 401) forgetSession(); })
+      .finally(() => setChecking(false));
+  }, [start]);
 
   if (checking) return <div className="mx-auto max-w-md py-24"><div className="skeleton h-40" /></div>;
-  if (!entity) {
+  if (!session) {
     return (
       <div className="mx-auto grid max-w-5xl items-center gap-10 py-6 lg:grid-cols-2 lg:py-12">
         <div className="rise">
@@ -80,37 +105,41 @@ export default function EntidadPage() {
           </ul>
         </div>
         <Card className="rise">
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); login(key, remember); }}>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); signIn(); }}>
             <div className="flex items-center gap-3">
               <span className="grid h-11 w-11 place-items-center rounded-2xl bg-brand-soft text-brand-ink"><Building /></span>
               <div><div className="font-semibold">Acceso para entidades</div><div className="text-xs text-muted">Bancos, operadores y tiendas</div></div>
             </div>
             <label className="block text-sm font-medium">
-              Llave de acceso (API key)
-              <div className="relative mt-1.5">
-                <Key className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" width={16} height={16} />
-                <input type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" placeholder="sec_live_…"
-                       className="w-full rounded-xl border border-line bg-surface py-2.5 pl-9 pr-3 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand/15" />
+              Correo
+              <input type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} autoComplete="username" placeholder="panel@tuentidad.com"
+                     className={`${INPUT} pl-3`} />
+            </label>
+            <label className="block text-sm font-medium">
+              Contraseña
+              <div className="relative">
+                <Key className="pointer-events-none absolute left-3 top-[60%] -translate-y-1/2 text-muted" width={16} height={16} />
+                <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="current-password" className={`${INPUT} pl-9`} />
               </div>
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-brand" />
-              Recordar la llave en este equipo
+              Recordar en este equipo
             </label>
-            <Button disabled={!key} className="w-full py-2.5">Entrar al panel</Button>
+            <Button disabled={!correo || !clave || busy} className="w-full py-2.5">{busy ? "Entrando…" : "Entrar al panel"}</Button>
             {error && <Notice>{error}</Notice>}
             <p className="text-xs text-muted">{demo
-              ? "Demostración: python scripts/seed_demo.py --nueva-llave muestra la llave de BancoAndino (entidad ficticia) y un enlace que entra sin escribirla."
-              : "La llave te la entrega el equipo de Desenmascara cuando conecta tu entidad a Llamada Verificada."}</p>
+              ? "Demostración: python scripts/seed_demo.py muestra el correo y la contraseña de BancoAndino (entidad ficticia)."
+              : "El correo y la contraseña te los entrega el equipo de Desenmascara cuando conecta tu entidad a Llamada Verificada."}</p>
           </form>
         </Card>
       </div>
     );
   }
-  return <Panel entity={entity.nombre} apiKey={key} onLogout={() => { setEntity(null); setKey(""); forgetKey(); }} />;
+  return <Panel entity={session.nombre} token={session.token} onLogout={() => { setSession(null); forgetSession(); }} />;
 }
 
-function Panel({ entity, apiKey, onLogout }: { entity: string; apiKey: string; onLogout: () => void }) {
+function Panel({ entity, token, onLogout }: { entity: string; token: string; onLogout: () => void }) {
   const [telefono, setTelefono] = useState("+57 310 000 0000");
   const [motivo, setMotivo] = useState("Confirmar una compra");
   const [asesor, setAsesor] = useState("Laura M.");
@@ -119,7 +148,7 @@ function Panel({ entity, apiKey, onLogout }: { entity: string; apiKey: string; o
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(Date.now());
 
-  const load = useCallback(() => api<Llamada[]>("/llamadas/hoy", { headers: { "X-Entity-API-Key": apiKey } }), [apiKey]);
+  const load = useCallback(() => api<Llamada[]>("/llamadas/hoy", { headers: bearer(token) }), [token]);
   const { data: calls, refresh } = useLive(load, 4000);
 
   useEffect(() => {
@@ -131,7 +160,7 @@ function Panel({ entity, apiKey, onLogout }: { entity: string; apiKey: string; o
     setError(null);
     setCopied(false);
     try {
-      setRegistro(await postJSON<Registro>("/llamadas/registrar", { telefono_cliente: telefono, motivo, asesor }, { "X-Entity-API-Key": apiKey }));
+      setRegistro(await postJSON<Registro>("/llamadas/registrar", { telefono_cliente: telefono, motivo, asesor }, bearer(token)));
       refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo registrar.");

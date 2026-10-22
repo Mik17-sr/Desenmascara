@@ -1,9 +1,11 @@
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.security import hash_api_key, new_api_key
-from app.db.models import Entidad
+from app.core.security import hash_api_key, hash_password, new_api_key, new_password, password_matches
+from app.db.models import AccesoEntidad, Entidad
 from app.engine.pistas import plain
 
 
@@ -39,6 +41,29 @@ async def create(session: AsyncSession, nombre: str, tipo: str, dominio: str | N
     session.add(entidad)
     await session.flush()
     return entidad, key
+
+
+async def by_id(session: AsyncSession, entity_id: str) -> Entidad | None:
+    try:
+        entidad = await session.get(Entidad, UUID(entity_id))
+    except ValueError:
+        return None
+    return entidad if entidad and entidad.activa else None
+
+
+async def add_access(session: AsyncSession, entidad: Entidad, correo: str) -> str:
+    """Panel sign-in for an entity. Returns the generated password, shown once: only its hash is stored."""
+    password = new_password()
+    session.add(AccesoEntidad(entidad_id=entidad.id, correo=correo.strip().lower(), clave_hash=hash_password(password)))
+    await session.flush()
+    return password
+
+
+async def by_login(session: AsyncSession, correo: str, clave: str) -> Entidad | None:
+    acceso = await session.scalar(select(AccesoEntidad).where(AccesoEntidad.correo == correo.strip().lower()))
+    if acceso is None or not password_matches(clave, acceso.clave_hash):
+        return None
+    return await by_id(session, str(acceso.entidad_id))
 
 
 def panel_link(key: str) -> str:
