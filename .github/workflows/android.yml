@@ -1,0 +1,42 @@
+# Builds the Android app (android/) on GitHub, so that no computer needs the Android SDK, and publishes the APK
+# as a release: https://github.com/Mik17-sr/Desenmascara/releases/latest/download/desenmascara-llamadas.apk
+name: App Android
+
+on:
+  push:
+    branches: [main]
+    paths: ["android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Construir el APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk desenmascara-llamadas.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desenmascara-llamadas
+          path: desenmascara-llamadas.apk
+      - name: Publicar en Releases
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
+        with:
+          tag_name: app-android-${{ github.run_number }}
+          name: Identificador de llamadas · versión ${{ github.run_number }}
+          body: |
+            Desenmascara · Identificador de llamadas para Android 10 o más nuevo.
+            Descarga desenmascara-llamadas.apk, instálala, ábrela y toca «Activar identificador».
+          files: desenmascara-llamadas.apk
+          make_latest: true

@@ -461,3 +461,28 @@ El repositorio es público, así que Render lo encuentra pegando la URL `https:/
 - No hay IA local (Ollama no cabe): responden las reglas. Medido así (`IA_LOCAL=false`): 20 de 20 estafas reales y 14 de 14 de prueba, sin falsos positivos.
 - Capturas: el OCR llegó a 416 MB en la prueba. Cabe en los 512 MB, pero con poca CPU tarda más; el bot espera hasta 120 s. Notas de voz: Whisper `tiny`; si una llega mientras se lee una captura, la memoria puede pasar de 512 MB y Render reinicia el servicio (los datos no se pierden: están en Supabase).
 - Con el plan Standard (2 GB) todo esto funciona holgado.
+
+---
+
+## 19. App de Android: identificador de llamadas
+
+Una llamada de teléfono no pasa por Telegram, así que el bot no la puede ver: para el aviso automático hace falta una app en el celular. `android/` es esa app. Cuando entra una llamada de un número que no está en los contactos, Android se la muestra a la app; la app pregunta al Banco de números de Desenmascara (`/api/v1/banco/consultar`, el mismo de la página) y muestra un aviso encima de la llamada:
+
+| Aviso | Cuándo |
+|---|---|
+| 🔴 **NO CONTESTES** | El número tiene reportes de alto riesgo |
+| 🟡 **Cuidado** / **Contesta con cuidado** | Pocos reportes, en revisión o sin reportes |
+| 🟢 **Línea oficial de…** | Es una línea que la entidad publica o registró (con la advertencia de que el número en pantalla se puede falsificar) |
+
+No bloquea ni silencia llamadas, no lee los contactos y solo envía el número que llama. Sin el aviso automático, el bot hace lo mismo a mano: opción 3, «¿Contesto o no?».
+
+**Instalarla (Android 10 o más nuevo):**
+
+1. Descarga `desenmascara-llamadas.apk` de [Releases](https://github.com/Mik17-sr/Desenmascara/releases/latest) en el celular. GitHub la construye sola con cada cambio en `android/` (`.github/workflows/android.yml`).
+2. Ábrela y permite instalar apps de esta fuente. Android puede advertir que es una app no verificada: es normal, porque no viene de Play Store.
+3. Abre **Desenmascara**, permite las notificaciones y toca **Activar identificador**; elige Desenmascara como app de identificación de llamadas.
+4. Para probarla sin esperar una llamada: escribe un número en **Probar con un número**.
+
+**Compilarla en un computador** (opcional: GitHub ya lo hace): JDK 17 y el SDK de Android (plataforma 34), y luego `cd android` y `gradlew assembleDebug`. El APK queda en `android/app/build/outputs/apk/debug/`.
+
+Límites: en iPhone, Apple no deja que una app consulte un número en vivo; los números guardados en los contactos no se revisan; con el plan gratis de Render, el primer aviso después de un rato sin uso puede tardar hasta un minuto.

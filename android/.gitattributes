@@ -1,0 +1,4 @@
+# gradlew runs on Linux (GitHub Actions): it must keep LF line endings even when committed from Windows.
+gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary

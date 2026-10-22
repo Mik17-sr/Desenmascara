@@ -1,0 +1,7 @@
+# Built on each computer, never committed
+build/
+.gradle/
+app/build/
+local.properties
+.idea/
+*.iml

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Desenmascara's teal with the white shield. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FF0E9F8E"
+        android:pathData="M24,0a24,24 0,1 1,0 48a24,24 0,1 1,0 -48z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M24,10l-11,4.2v8.4c0,7.6 4.7,14.7 11,16.4c6.3,-1.7 11,-8.8 11,-16.4v-8.4z" />
+    <path
+        android:fillColor="#FF0E9F8E"
+        android:pathData="M21.8,29.5l-5,-5l2,-2l3,3l7.2,-7.2l2,2z" />
+</vector>
