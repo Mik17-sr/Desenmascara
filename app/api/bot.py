@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.analysis import describe_hit, normalize_value, run_analysis, text_from_audio, text_from_image
 from app.api.deps import session
-from app.core.ratelimit import bot_user_limiter
+from app.core.ratelimit import RateLimiter, bot_user_limiter, report_limiter
 from app.core.security import require_bot
 from app.db.models import Usuario
 from app.engine.juez import MODALIDADES, risk_level
@@ -54,11 +54,11 @@ async def _user(db: AsyncSession, persona: Persona) -> Usuario:
     return await usuarios.get_or_create(db, persona.telegram_id, persona.chat_id, persona.nombre)
 
 
-async def _consented(db: AsyncSession, persona: Persona) -> Usuario:
+async def _consented(db: AsyncSession, persona: Persona, limiter: RateLimiter = bot_user_limiter) -> Usuario:
     user = await _user(db, persona)
     if user.consentimiento_at is None:
         raise HTTPException(status_code=403, detail="Falta el consentimiento para tratar los datos.")
-    bot_user_limiter.check(user.telegram_hash)
+    limiter.check(user.telegram_hash)
     return user
 
 
@@ -215,7 +215,7 @@ class ReporteIn(ValorIn):
 
 @router.post("/reportar")
 async def report(body: ReporteIn, db: AsyncSession = Depends(session)) -> dict:
-    user = await _consented(db, body)
+    user = await _consented(db, body, report_limiter)
     tipo, valor = normalize_value(body.tipo, body.valor)
     modalidad = body.modalidad if body.modalidad in MODALIDADES else None
     verificacion = UUID(body.verificacion_id) if body.verificacion_id else None

@@ -281,8 +281,9 @@ def _remember(context: ContextTypes.DEFAULT_TYPE, result: AnalysisResult, text: 
     now = datetime.now(COLOMBIA)
     context.user_data["ultimo"] = {
         "texto": text[:600], "nivel": result.risk_level.value, "puntaje": result.risk_score, "categoria": result.category,
-        "fecha": f"{now:%d/%m/%Y}, {now.hour % 12 or 12}:{now:%M} {'a. m.' if now.hour < 12 else 'p. m.'}",
+        "dia": f"{now:%d/%m/%Y}", "hora": f"{now.hour % 12 or 12}:{now:%M} {'a. m.' if now.hour < 12 else 'p. m.'}",
         "fuente": fuente, "enlaces": enlaces[:5], "datos": reportables[:8],
+        "motivos": list(dict.fromkeys(s.label for s in result.signals if s.points > 0))[:3],
         "referencia": f"DSM-{result.verification_id.replace('-', '')[:8].upper()}" if result.verification_id else None,
     }
     return reportables
@@ -563,6 +564,7 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except TelegramError:  # the tap waited too long for Telegram to accept the answer: still do what was asked
         logger.info("Late button answer")
     data = query.data or ""
+    logger.info("Button %s", data.split(":", 1)[0])  # never the token after ":"
     if data == "consent":
         try:
             await _api(context).post("/bot/consentimiento", json=_who(update))
@@ -583,7 +585,7 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     elif data.startswith("yc_"):
         steps = textos.YA_CAI_PASOS.get(data[3:], [])
         await _reply(update, join(
-            f"🔴 {b('Calma, vamos paso a paso')}",
+            f"🔴 {b(textos.YA_CAI_TITULOS.get(data[3:], 'Calma, vamos paso a paso'))}",
             *[esc(f"{n}. {step}") for n, step in enumerate(steps, 1)],
             esc("Cuando puedas, toca «Kit de denuncia»: te armo un resumen para enviar."),
         ), reply_markup=InlineKeyboardMarkup([[Btn("Kit de denuncia", callback_data="kit")]]))

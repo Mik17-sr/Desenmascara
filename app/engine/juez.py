@@ -44,8 +44,9 @@ VERIFICA_LA_DEUDA = ("Antes de pagar, verifica la deuda con la empresa original 
 # Deterministic patterns from Pistas (real cases in datasets/casos_reales.csv) -> modalidad. The ones in
 # PATRON_ALTO are specific enough to be high risk on their own; the false relative stays "sospechoso".
 PATRON_MODALIDAD = {"falso_familiar": "falso_familiar", "robo_de_cuenta": "robo_de_cuenta", "falsa_multa": "falso_funcionario",
-                    "falso_empleo": "falso_empleo", "phishing": "suplantacion_bancaria", "cobro_falso": "cobro_falso"}
-PATRON_ALTO = {"robo_de_cuenta", "falsa_multa", "falso_empleo", "phishing", "cobro_falso"}
+                    "falso_empleo": "falso_empleo", "phishing": "suplantacion_bancaria", "cobro_falso": "cobro_falso",
+                    "falsa_compra": "falsa_compra"}
+PATRON_ALTO = {"robo_de_cuenta", "falsa_multa", "falso_empleo", "phishing", "cobro_falso", "falsa_compra"}
 P_PIDE ={"codigo_o_clave": 35, "instalar_app": 30, "mover_dinero": 30, "dinero": 20, "datos_personales": 20, "abrir_enlace": 10}
 # The false relative stays "sospechoso" (the guide's case 2): the Círculo confirms it with the real person.
 STRONG_MODALIDADES = {"suplantacion_bancaria", "falso_asesor", "falsa_compra", "paquete_retenido", "falso_funcionario",
@@ -280,7 +281,7 @@ def judge(e: Evidencia) -> AnalysisResult:
     if e.inyeccion or banco_alto:
         score = max(score, 70)  # rule: hidden orders for the AI, or a number the community marked red
     if patron in PATRON_ALTO:
-        score = max(score, 75)  # rule: a pattern of real scams: account theft, fake fine, easy-money job, phishing
+        score = max(score, 75)  # rule: a pattern of real scams: account theft, fake fine, easy-money job, phishing, fake sale
     if patron == "falso_familiar" or modalidad == "falso_familiar":
         # The team's rule: "sospechoso" while it only says "new number" (the Círculo can confirm it), high risk as soon
         # as it asks for money, a transfer or a code.

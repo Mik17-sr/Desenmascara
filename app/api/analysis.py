@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 CANALES = {"telegram", "dashboard", "api"}
+# A measurement (scripts/evaluar.py) is answered like any other but never saved: it is not a real person's check,
+# and saved it would inflate the Radar, the campaigns and the red results of the Banco.
+EVALUACION = "evaluacion"
 FALLBACK = AnalysisResult(
     risk_level=RiskLevel.INCONCLUSIVE,
     risk_score=0,
@@ -34,8 +37,10 @@ async def run_analysis(db: AsyncSession, payload: AnalysisInput, background: Bac
     except Exception:
         logger.exception("Analysis engine failed")
         return FALLBACK.model_copy(deep=True)
-    result.verification_id = str(uuid4())
     result.extracted_text = extracted
+    if payload.source == EVALUACION:
+        return result
+    result.verification_id = str(uuid4())
     canal = payload.source if payload.source in CANALES else "api"
     background.add_task(verificaciones.save, UUID(result.verification_id), usuario_id=usuario_id, canal=canal,
                         tipo=tipo_registro, text=payload.text, result=result, huella=huella, pistas=found)

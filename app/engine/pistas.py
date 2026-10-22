@@ -58,6 +58,10 @@ PATRONES = {
                         "soportedetelegram", "soportedefacebook", "soportedeinstagram"),),
     "falsa_multa": (("sancionvial", "comparendo", "fotomulta", "infractor", "multadetransito"),
                     ("descuento", "descto", "dto", "embargo", "decomiso", "cobrojuridico", "ingresa", "paga", "cancela")),
+    # A sale that asks for an advance, or to go on in another app: the guide's fake purchase, without waiting for the AI.
+    "falsa_compra": (("vendo", "venta", "remate", "anuncio", "articulo", "producto", "enviogratis"),
+                     ("anticipo", "apartar", "apartalo", "apartala", "separar", "separalo", "separala", "abono", "poradelantado",
+                      "pagoanticipado", "otraapp", "linkdepago", "pagaprimero")),
     "falso_empleo": (("generadinero", "ganadinero", "ganahasta", "ingresosextra", "trabajodesdecasa", "ganadiario"),),
     "phishing": (("verifyyouraccount", "verifyaccount", "confirmyouridentity", "logintoyouraccount", "updateyourpayment"),
                  ("suspiciousactivity", "beenlocked", "beensuspended", "unauthorized", "unusualactivity")),

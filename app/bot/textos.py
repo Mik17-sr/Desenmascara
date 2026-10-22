@@ -62,6 +62,12 @@ YA_CAI = join(
     b("Calma, vamos paso a paso."),
     esc("¿Qué entregaste o qué quieres hacer?"),
 )
+YA_CAI_TITULOS = {
+    "codigo": "Si entregaste una clave o un código",
+    "tarjeta": "Si entregaste los datos de tu tarjeta",
+    "dinero": "Si enviaste dinero",
+    "datos": "Si entregaste datos personales",
+}
 YA_CAI_PASOS = {
     "codigo": [
         "Llama ya a la línea de tu banco (está al respaldo de tu tarjeta) y pide bloquear.",

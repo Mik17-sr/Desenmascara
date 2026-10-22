@@ -242,3 +242,13 @@ def test_links_the_ocr_glued_together_are_put_back():
     found = extract("SystemGroup.Info\n6017560385wa.me/\n+573044722062\nInfo6017560385wa.me/")
     assert found.urls == ["https://systemgroup.info", "https://wa.me/+573044722062"]
     assert found.telefonos == ["576017560385", "573044722062"]
+
+
+def test_a_fake_sale_is_caught_without_the_ai():
+    # Option 5 of the menu: when the AI is slow, the rules alone must still say it.
+    for offer in ("Vendo iPhone 13 nuevo a $900.000, solo hoy. Para apartarlo consigna el 50% a la llave Bre-B 3001112233.",
+                  "Hola, vi tu anuncio. Para seguir con la compra escríbeme por otra app y te paso el link de pago."):
+        result = judge(evidence(offer, None, ia_consultada=True))
+        assert result.risk_level == RiskLevel.HIGH and result.category == "Posible estafa en compra", (offer, result.risk_score)
+    # A store's receipt is not a sale asking for an advance.
+    assert "falsa_compra" not in extract("EnvíosYa: tu pedido 58321 fue entregado hoy. Gracias por tu compra.").patrones

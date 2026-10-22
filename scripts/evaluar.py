@@ -6,7 +6,8 @@
 A scam counts as detected when the result is SOSPECHOSO or ALTO RIESGO; a legitimate message
 counts as a false positive when it is not BAJO RIESGO. Rows marked "dudoso" (real collections that
 may be genuine) should be at least SOSPECHOSO and are reported apart. Goals in docs/07: sensitivity >= 95 %,
-false positives <= 5 %, P90 < 8 s. The checks are saved like any other, so they feed the Dashboard.
+false positives <= 5 %, P90 < 8 s. They go as "evaluacion": answered like any other, never saved, so the
+Dashboard keeps only real checks.
 """
 
 import csv
@@ -34,7 +35,7 @@ def main(path: Path) -> None:
             tipo = {"compra": "compra", "llamada": "llamada"}.get(row["canal"], "mensaje")
             started = time.perf_counter()
             try:
-                body = client.post(url, json={"text": row["texto"], "source": "api", "tipo": tipo}).json()
+                body = client.post(url, json={"text": row["texto"], "source": "evaluacion", "tipo": tipo}).json()
                 level = body["risk_level"]
             except (httpx.HTTPError, KeyError, ValueError):
                 level = "sin respuesta"

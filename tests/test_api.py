@@ -148,7 +148,15 @@ def test_banco_counts_each_person_once(client):
     again = client.post("/api/v1/bot/reportar", json=body, headers=BOT).json()
     assert again["nuevo"] is False and again["personas"] == 3
     found = client.get("/api/v1/banco/consultar", params={"tipo": "telefono", "valor": "3205551234"}).json()
-    assert found["personas"] == 3 and found["nivel"] == 18 and found["valor"] == "+57 320 ••• 1234"
+    # 3 people give 18 points, but a reported number is never "bajo riesgo".
+    assert found["personas"] == 3 and found["nivel"] == 40 and found["palabra"] == "Sospechoso" and found["valor"] == "+57 320 ••• 1234"
+
+
+def test_reporting_a_whole_message_does_not_use_up_the_analyses(client):
+    body = consenting(client, 501)
+    for n in range(15):
+        assert client.post("/api/v1/bot/reportar", json=body | {"valor": f"310 555 {n:04d}"}, headers=BOT).status_code == 200
+    assert client.post("/api/v1/bot/analizar", json=body | {"texto": "Hola, ¿cómo estás?"}, headers=BOT).status_code == 200
 
 
 def test_owner_can_ask_for_review(client):
@@ -198,3 +206,14 @@ def test_forget_me_deletes_the_person(client):
     person = consenting(client, 900)
     assert client.post("/api/v1/bot/borrar", json=person, headers=BOT).json() == {"ok": True}
     assert client.post("/api/v1/bot/inicio", json=person, headers=BOT).json()["consentimiento"] is False
+
+
+def test_a_measurement_is_answered_but_never_saved(client):
+    def radar():
+        return {k: v for k, v in client.get("/api/v1/dashboard/radar").json().items() if k != "actualizado"}
+
+    before = radar()
+    body = {"text": "Vendo moto en remate. Para apartarla consigna un anticipo hoy.", "source": "evaluacion", "tipo": "compra"}
+    answer = client.post("/api/v1/analyze", json=body).json()
+    assert answer["risk_level"] == "high" and answer["verification_id"] is None
+    assert radar() == before

@@ -7,7 +7,8 @@ from telegram.error import BadRequest
 
 from app.bot import client, handlers, textos
 from app.bot.formatters import (
-    format_analysis, format_call, format_code, format_heard, format_kit, format_not_connected, format_number, format_report,
+    block, format_analysis, format_call, format_code, format_heard, format_kit, format_not_connected, format_number, format_report,
+    relato,
 )
 from app.schemas.contract import AnalysisResult, SignalItem, SignalSource
 
@@ -43,7 +44,8 @@ def result(level="high", score=96, summary="Es muy probable que sea una estafa."
     return AnalysisResult(risk_level=level, risk_score=score, summary=summary, **kwargs)
 
 
-KIT = {"nivel": "high", "puntaje": 100, "categoria": "Posible cobranza falsa", "fecha": "21/10/2026, 10:48 p. m.",
+KIT = {"nivel": "high", "puntaje": 100, "categoria": "Posible cobranza falsa", "dia": "21/10/2026", "hora": "10:48 p. m.",
+       "motivos": ["Pide pagar o escribir por un canal que vino en el mismo mensaje.", "Usa urgencia, amenazas o premios."],
        "fuente": "captura", "referencia": "DSM-1A2B3C4D", "texto": "Systemgroup y Credivalores…",
        "datos": [("telefono", "576017560385"), ("telefono", "573044722062"), ("enlace", "systemgroup.info")],
        "enlaces": ["https://systemgroup.info", "https://wa.me/+573044722062"]}
@@ -118,10 +120,27 @@ def test_the_kit_is_ready_for_the_police():
     assert kit.startswith("📋 *KIT DE DENUNCIA*") and "DSM\\-1A2B3C4D" in kit
     assert "`+57 601 756 0385`" in kit and "`+57 304 472 2062`" in kit
     # Links in a box, so that nobody opens them by mistake; a screenshot is attached, not its OCR text.
-    assert "`https://wa.me/+573044722062`" in kit and "Systemgroup y Credivalores" not in kit and "Adjunta la captura" in kit
+    assert "`https://wa.me/+573044722062`" in kit and "Systemgroup y Credivalores" not in kit and "adjunta la captura original" in kit
     assert "adenunciar\\.policia\\.gov\\.co" in kit
     typed = format_kit(KIT | {"fuente": "texto", "texto": "Hola,\n\n  paga  hoy"}, textos.LINEAS_DENUNCIA)
-    assert "_«Hola, paga hoy»_" in typed
+    assert "El mensaje dice: «Hola, paga hoy»." in typed
+
+
+def test_the_account_of_the_facts_uses_only_what_was_analysed():
+    text = relato(KIT)
+    assert text.startswith("El 21/10/2026, a las 10:48 p. m., revisé en Desenmascara un mensaje que recibí, "
+                           "que identificó como «Posible cobranza falsa». Anexo la captura de pantalla.")
+    assert ("En el mensaje aparecen los teléfonos +57 601 756 0385 y +57 304 472 2062, "
+            "y los enlaces https://systemgroup.info y https://wa.me/+573044722062.") in text
+    assert text.endswith("como alto riesgo (100/100) por estas señales: pide pagar o escribir por un canal que vino "
+                         "en el mismo mensaje; usa urgencia, amenazas o premios.")
+    # Nothing it cannot know: no amount, no "perdí", no bank name that was not in the message.
+    assert "$" not in text and "perd" not in text
+    call = relato(KIT | {"fuente": "voz", "texto": "Dijeron ser del banco", "datos": [], "enlaces": []})
+    assert "conté en Desenmascara una llamada que recibí" in call and "Lo que me dijeron: «Dijeron ser del banco»." in call
+    # In a box with a «Copiar» button; the backtick of a message cannot close it early.
+    assert "```\nEl 21/10/2026" in format_kit(KIT, textos.LINEAS_DENUNCIA)
+    assert "\\`" in block("a`b")
 
 
 def test_reporting_answers_with_what_went_into_the_banco():

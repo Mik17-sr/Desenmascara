@@ -24,6 +24,8 @@ class RateLimiter:
 
 public_limiter = RateLimiter(limit=20)
 bot_user_limiter = RateLimiter(limit=12)
+# «Reportar» sends one call per number or link of the message: it must not use up the analyses.
+report_limiter = RateLimiter(limit=40)
 
 
 async def limit_by_ip(request: Request) -> None:

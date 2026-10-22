@@ -196,6 +196,55 @@ def pretty_phone(value: str) -> str:
     return f"+57 {digits[2:5]} {digits[5:8]} {digits[8:]}" if digits.startswith("57") and len(digits) == 12 else value
 
 
+def _listing(items: list[str], last: str = " y ") -> str:
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + last + items[-1]
+
+
+RELATO_DATO = {"telefono": ("el teléfono", "los teléfonos"), "llave": ("la llave Bre-B", "las llaves Bre-B"),
+               "cuenta": ("la cuenta", "las cuentas"), "enlace": ("el enlace", "los enlaces")}
+
+
+def relato(kit: dict) -> str:
+    """The account of the facts for the police form, in first person. Built only from what was analysed: it never
+    invents an amount, a date or a number, so what the person lost is left for them to add."""
+    fuente = kit.get("fuente", "texto")
+    como = f", que identificó como «{kit['categoria']}»" if kit.get("categoria") else ""
+    cuando = f"El {kit['dia']}, a las {kit['hora']}," if kit.get("dia") else "Hoy"
+    snippet = " ".join((kit.get("texto") or "").split())
+    snippet = snippet if len(snippet) <= 400 else snippet[:397] + "…"
+    if fuente == "voz":
+        parts = [f"{cuando} conté en Desenmascara una llamada que recibí{como}."]
+        if snippet:
+            parts.append(f"Lo que me dijeron: «{snippet}».")
+    else:
+        parts = [f"{cuando} revisé en Desenmascara un mensaje que recibí{como}."]
+        if fuente == "captura":
+            parts.append("Anexo la captura de pantalla.")
+        elif snippet:
+            parts.append(f"El mensaje dice: «{snippet}».")
+    groups = {}
+    for tipo, valor in kit.get("datos", []):
+        if tipo in TIPO_DATO:
+            groups.setdefault(tipo, []).append(pretty_phone(valor) if tipo == "telefono" else valor)
+    if kit.get("enlaces"):
+        groups["enlace"] = list(kit["enlaces"])
+    if groups:
+        donde = "En la llamada mencionaron" if fuente == "voz" else "En el mensaje aparecen"
+        named = [f"{RELATO_DATO[t][len(v) > 1]} {_listing(v)}" for t, v in groups.items()]
+        # "los teléfonos A y B, y el enlace C": the comma keeps the last group apart from a list that already has a "y".
+        parts.append(f"{donde} " + _listing(named, ", y " if any(len(v) > 1 for v in groups.values()) else " y ") + ".")
+    word = SEMAFORO[kit["nivel"]][1].lower()
+    motivos = [m[0].lower() + m[1:].rstrip(".") for m in kit.get("motivos", []) if m]
+    parts.append(f"Desenmascara lo calificó como {word} ({kit['puntaje']}/100)"
+                 + (f" por estas señales: {'; '.join(motivos)}." if motivos else "."))
+    return " ".join(parts)
+
+
+def block(value: str) -> str:
+    """A pre block: Telegram shows it with a «Copiar» button. Inside, only ` and \\ are special."""
+    return "```\n" + value.replace("\\", "\\\\").replace("`", "\\`") + "\n```"
+
+
 def format_kit(kit: dict, lineas: list[str]) -> str:
     """A summary to hand to the bank or the police. Links go in a box so that nobody opens them by mistake."""
     dot, word = SEMAFORO[kit["nivel"]]
@@ -206,7 +255,7 @@ def format_kit(kit: dict, lineas: list[str]) -> str:
         f"📋 {b('KIT DE DENUNCIA')}",
         it(f"Desenmascara · Referencia {kit['referencia']}") if kit.get("referencia") else None,
         "",
-        f"{b('Fecha:')} {esc(kit['fecha'] + ' (hora de Colombia)')}",
+        f"{b('Fecha:')} {esc(kit['dia'] + ', ' + kit['hora'] + ' (hora de Colombia)')}",
         f"{b('Resultado:')} {dot} {esc(resultado)}",
         f"{b('Modalidad:')} {esc(kit['categoria'])}" if kit.get("categoria") else None,
         f"{b('Evidencia:')} {esc(FUENTE[fuente])}",
@@ -216,12 +265,11 @@ def format_kit(kit: dict, lineas: list[str]) -> str:
         lines += ["", b("Datos que aparecen en el mensaje")]
         lines += [f"• {esc(TIPO_DATO[tipo])}: {code(pretty_phone(valor) if tipo == 'telefono' else valor)}" for tipo, valor in datos]
         lines += [f"• {esc('Enlace')}: {code(url)}" for url in kit.get("enlaces", [])]
+    lines += ["", f"{b('Relato de los hechos')} {it('(cópialo en tu denuncia)')}", block(relato(kit)),
+              f"{b('Completa:')} {esc('si entregaste dinero o datos, agrega cuánto, cuándo y por qué medio.')}"]
+    lines += ["", b("Dónde denunciar"), *[esc(f"{n}. {line}") for n, line in enumerate(lineas, 1)]]
+    consejo = "no borres el chat y no respondas más a ese número."
     if fuente == "captura":
-        lines += ["", f"{b('Adjunta la captura original')} {esc('a tu denuncia: es la prueba.')}"]
-    elif kit.get("texto"):
-        snippet = " ".join(kit["texto"].split())
-        snippet = snippet if len(snippet) <= 500 else snippet[:497] + "…"
-        lines += ["", b("Lo que se escuchó" if fuente == "voz" else "Mensaje recibido"), it(f"«{snippet}»")]
-    lines += ["", b("Dónde denunciar"), *[esc(f"{n}. {line}") for n, line in enumerate(lineas, 1)],
-              "", f"{b('Consejo:')} {esc('no borres el chat ni las capturas, y no respondas más a ese número.')}"]
+        consejo = "adjunta la captura original a la denuncia, " + consejo
+    lines += ["", f"{b('Consejo:')} {esc(consejo)}"]
     return join(*lines)

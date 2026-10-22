@@ -16,6 +16,7 @@ RECENT_DAYS = 30
 POINTS_PER_PERSON, PERSON_MAX = 6, 45
 POINTS_PER_RED, RED_MAX = 2, 20
 POINTS_CAMPAIGN = 15
+REPORTED_FLOOR = 40  # "sospechoso"
 
 
 def published_line(tipo: str, valor: str) -> oficiales.OfficialLine | None:
@@ -48,6 +49,8 @@ async def get_or_create(session: AsyncSession, tipo: str, valor: str) -> Indicad
 async def recompute(session: AsyncSession, indicador: Indicador) -> int:
     """Risk 0-100: +6 per distinct person (max 45), +2 per red result (max 20), +15 in an active campaign.
 
+    A number somebody reported is never "bajo riesgo": it starts at "sospechoso" (40).
+
     People who reported more than 30 days ago count half, because numbers get recycled.
     """
     now = utcnow()
@@ -63,6 +66,8 @@ async def recompute(session: AsyncSession, indicador: Indicador) -> int:
         campana = await session.get(Campana, indicador.campana_id)
         if campana and now - campana.ultimo_reporte_at <= timedelta(hours=24):
             score += POINTS_CAMPAIGN
+    if indicador.personas_distintas:
+        score = max(score, REPORTED_FLOOR)
     indicador.nivel_riesgo = min(100, score)
     return indicador.nivel_riesgo
 
