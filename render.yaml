@@ -1,4 +1,4 @@
-# Render Blueprint: the API with the Telegram bot inside (webhook) and the Dashboard, both on the free plan.
+# Render Blueprint: the API with the Telegram bot inside (webhook, free web service) and the Dashboard (static site).
 # Step by step in the README, section "Publicar en Render". The data lives in Supabase: Render's disk is
 # erased on every deploy and restart, so SQLite would lose it.
 #
@@ -51,16 +51,17 @@ services:
       - key: DASHBOARD_ORIGINS
         sync: false
 
+  # A Static Site: plain files on Render's CDN, free and never asleep. Every page fetches from the API in the browser.
   - type: web
     name: desenmascara-dashboard
-    runtime: node
-    plan: free
-    region: virginia
+    runtime: static
     branch: main
     rootDir: dashboard
     buildCommand: npm ci && npm run build
-    startCommand: npm run start
+    staticPublishPath: out
     envVars:
+      - key: NEXT_OUTPUT
+        value: export
       - key: NODE_VERSION
         value: "22"
       # The API's address + /api/v1, e.g. https://desenmascara-api.onrender.com/api/v1. It is read when building:

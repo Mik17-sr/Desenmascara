@@ -23,7 +23,11 @@ def test_the_blueprint_never_holds_a_secret():
     assert all(api[key].get("sync") is False and "value" not in api[key] for key in SECRETS)
     # The bot inside the service calls the API at its own port; no Ollama there.
     assert api["API_BASE_URL"]["value"].endswith(":" + str(api["PORT"]["value"])) and api["IA_LOCAL"]["value"] == "false"
-    assert services["desenmascara-dashboard"]["rootDir"] == "dashboard"
+    # The Dashboard as a static site: Next exports out/ only with NEXT_OUTPUT=export (dashboard/next.config.ts).
+    dashboard = services["desenmascara-dashboard"]
+    assert dashboard["runtime"] == "static" and dashboard["rootDir"] == "dashboard" and dashboard["staticPublishPath"] == "out"
+    assert {"key": "NEXT_OUTPUT", "value": "export"} in dashboard["envVars"]
+    assert 'process.env.NEXT_OUTPUT === "export"' in (BLUEPRINT.parent / "dashboard" / "next.config.ts").read_text(encoding="utf-8")
 
 
 def test_on_a_computer_the_bot_stays_by_polling():

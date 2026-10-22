@@ -366,33 +366,73 @@ Falta o es visión: WhatsApp (Twilio); los 4 casos reales del equipo y el datase
 
 ## 18. Publicar en Render (plan gratis)
 
-`render.yaml` crea dos servicios gratis: **desenmascara-api** (la API, con el bot adentro) y **desenmascara-dashboard**. En el servidor el bot no pregunta a Telegram: Telegram le envía cada mensaje a `POST /telegram/webhook` (con una llave secreta) y la API lo atiende. En tu computador todo sigue igual.
+Son dos piezas, ambas gratis:
+
+- **El Dashboard, como sitio estático** (*Static Site*): archivos en la red de Render, que **nunca se duerme**. Cada página le pide los datos a la API desde el navegador, así que no necesita servidor (`NEXT_OUTPUT=export` en `dashboard/next.config.ts`).
+- **La API con el bot adentro, como servicio web** (*Web Service*): esta parte no puede ser estática, porque ejecuta el cerebro de 6 revisiones y atiende a Telegram. En el servidor el bot no pregunta a Telegram: Telegram le envía cada mensaje a `POST /telegram/webhook` (con una llave secreta). En tu computador todo sigue igual.
+
+El repositorio es público, así que Render lo encuentra pegando la URL `https://github.com/Mik17-sr/Desenmascara`, sin conectar la cuenta de GitHub. Lo único que cambia: con la URL pública Render **no** vuelve a desplegar solo cuando se sube un cambio; se hace con **Manual Deploy → Deploy latest commit**. Para que sea automático, el dueño del repositorio (Mik17-sr) conecta su GitHub en Render y crea los servicios desde su cuenta, o con **New → Blueprint**, que lee `render.yaml`.
 
 **Antes de Render**
 
 1. Pasa los datos a Supabase (sección 14): el disco de Render se borra en cada despliegue y reinicio, y SQLite los perdería. Crea el proyecto en la región **us-east-1**, cerca de Render (Virginia), y guarda la cadena del **Session pooler**.
 2. Copia tus datos: pon esa cadena como `DATABASE_URL` en tu `.env` y ejecuta `python scripts/migrar_a_supabase.py`.
 
-**En Render**
+**A. La API y el bot (Web Service)**
 
-3. En [render.com](https://render.com): **New → Blueprint**, conecta el repositorio `Mik17-sr/Desenmascara` (rama `main`). Render lee `render.yaml`.
-4. Llena los valores que pide. Pégalos tú en Render; no los mandes por chat:
+3. En [render.com](https://render.com): **New → Web Service → Public Git Repository**, pega `https://github.com/Mik17-sr/Desenmascara` y **Connect**.
+4. Llena así:
 
-| Variable | De dónde sale |
+| Campo | Valor |
 |---|---|
+| Name | `desenmascara-api` |
+| Language | Python 3 |
+| Branch | `main` |
+| Region | Virginia (US East) |
+| Root Directory | (vacío) |
+| Build Command | `pip install -r requirements.txt` |
+| Start Command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| Instance Type | Free |
+| Health Check Path (en *Advanced*) | `/health` |
+
+5. En **Environment Variables** agrega estas. Pégalas tú en Render; no las mandes por chat:
+
+| Variable | Valor |
+|---|---|
+| `PYTHON_VERSION` | `3.12.10` |
+| `PORT` | `10000` |
+| `API_BASE_URL` | `http://127.0.0.1:10000` |
+| `IA_LOCAL` | `false` |
+| `PRECARGAR_MODELOS` | `false` |
+| `WHISPER_MODEL` | `tiny` |
+| `BOT_TIMEOUT_IMAGEN` | `120` |
+| `BOT_TIMEOUT_VOZ` | `150` |
 | `DATABASE_URL` | Supabase, Session pooler |
 | `TELEGRAM_BOT_TOKEN` | tu `.env` (el token de @BotFather) |
 | `HMAC_SECRET`, `ENCRYPTION_KEY`, `BOT_API_SECRET`, `ADMIN_API_KEY` | tu `.env`, **los mismos valores**: las huellas y los datos cifrados solo se abren con ellos |
-| `DASHBOARD_ORIGINS` | `https://desenmascara-dashboard.onrender.com` |
-| `NEXT_PUBLIC_API_URL` | `https://desenmascara-api.onrender.com/api/v1` |
+| `DASHBOARD_ORIGINS` | la dirección del Dashboard del paso 9, por ejemplo `https://desenmascara-dashboard.onrender.com` |
 
-   Si Render les da otras direcciones (porque el nombre ya estaba usado), corrige las dos últimas en **Environment** y vuelve a desplegar el Dashboard (**Manual Deploy**): `NEXT_PUBLIC_API_URL` se lee al construirlo. Para el tiempo real, agrega también `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` al Dashboard.
-5. Apaga el bot de tu computador. Al arrancar, la API registra el webhook y desde ahí Telegram le envía los mensajes a Render. Mientras el bot esté publicado, `python -m app.bot.client` no arranca, para no quitárselo al servidor; con `--forzar` lo traes de vuelta a tu computador.
-6. Comprueba `https://desenmascara-api.onrender.com/health`: debe decir `"base_de_datos": "ok"` e `"ia": "apagada"`. Luego escríbele «Hola» a @Desenmascara_bot.
+6. Apaga el bot de tu computador y toca **Deploy Web Service**. Al arrancar, la API registra el webhook y desde ahí Telegram le envía los mensajes a Render. Mientras el bot esté publicado, `python -m app.bot.client` no arranca, para no quitárselo al servidor; con `--forzar` lo traes de vuelta a tu computador.
+7. Copia la dirección que Render le dio (arriba, por ejemplo `https://desenmascara-api.onrender.com`) y abre `/health`: debe decir `"base_de_datos": "ok"` e `"ia": "apagada"`. Escríbele «Hola» a @Desenmascara_bot.
+
+**B. El Dashboard (Static Site)**
+
+8. **New → Static Site → Public Git Repository**, la misma URL, y llena así:
+
+| Campo | Valor |
+|---|---|
+| Name | `desenmascara-dashboard` |
+| Branch | `main` |
+| Root Directory | `dashboard` |
+| Build Command | `npm ci && npm run build` |
+| Publish Directory | `out` |
+
+   Y en **Environment Variables**: `NEXT_OUTPUT` = `export`, `NODE_VERSION` = `22` y `NEXT_PUBLIC_API_URL` = la dirección del paso 7 + `/api/v1` (por ejemplo `https://desenmascara-api.onrender.com/api/v1`). Para el tiempo real, también `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+9. **Deploy Static Site**. Copia su dirección, ponla en `DASHBOARD_ORIGINS` de la API (paso 5) y guarda: la API se reinicia sola. Si cambias `NEXT_PUBLIC_API_URL`, vuelve a desplegar el Dashboard (**Manual Deploy**): se lee al construirlo.
 
 **Qué esperar del plan gratis**
 
-- Se duerme a los 15 minutos sin uso: el primer mensaje después tarda alrededor de un minuto (Telegram lo reintenta y llega). Antes de una presentación, abre `/health` un minuto antes.
+- La API se duerme a los 15 minutos sin uso (el Dashboard estático no): el primer mensaje después tarda alrededor de un minuto (Telegram lo reintenta y llega). Antes de una presentación, abre `/health` un minuto antes.
 - No hay IA local (Ollama no cabe): responden las reglas. Medido así (`IA_LOCAL=false`): 20 de 20 estafas reales y 14 de 14 de prueba, sin falsos positivos.
 - Capturas: el OCR llegó a 416 MB en la prueba. Cabe en los 512 MB, pero con poca CPU tarda más; el bot espera hasta 120 s. Notas de voz: Whisper `tiny`; si una llega mientras se lee una captura, la memoria puede pasar de 512 MB y Render reinicia el servicio (los datos no se pierden: están en Supabase).
 - Con el plan Standard (2 GB) todo esto funciona holgado.
