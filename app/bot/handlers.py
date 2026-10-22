@@ -53,6 +53,10 @@ def _who(update: Update) -> dict:
     return {"telegram_id": update.effective_user.id, "chat_id": update.effective_chat.id, "nombre": update.effective_user.first_name}
 
 
+def _share_phone() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup([[KeyboardButton("Compartir mi número", request_contact=True)]], one_time_keyboard=True, resize_keyboard=True)
+
+
 def _menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[Btn(f"{n} · {label}", callback_data=f"m{n}")] for n, label in textos.MENU_OPTIONS])
 
@@ -168,6 +172,9 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _choose(update, context, simple)
     elif YA_CAI.search(text):
         await _choose(update, context, "6")
+    elif (context.user_data.get("llamada_pendiente") or context.user_data.get("codigo_por_confirmar")
+          or context.user_data.get("invitacion_token")) and _is_phone_only(text):
+        await _reply(update, textos.USA_EL_BOTON, reply_markup=_share_phone())
     elif modo == "circulo_nombre":
         await _ask_relative_phone(update, context, text)
     elif modo == "circulo_telefono":
@@ -209,6 +216,8 @@ async def on_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await _confirm_code(update, context, code)
     elif context.user_data.get("modo") == "revision_motivo" and context.user_data.get("motivo_pendiente"):
         await _review(update, context, context.user_data.pop("motivo_pendiente"))
+    else:  # nothing waiting (the server may have restarted meanwhile): offer the next step instead of silence
+        await _reply(update, esc("Si te están llamando, toca la entidad que dice llamarte:"), reply_markup=await _entity_buttons(context))
 
 
 async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -468,8 +477,7 @@ async def _verified_call(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
         ), reply_markup=InlineKeyboardMarkup(buttons) if buttons else None)
     elif info["estado"] == "falta_telefono":
         context.user_data["llamada_pendiente"] = text
-        await _reply(update, textos.PEDIR_TELEFONO, reply_markup=ReplyKeyboardMarkup(
-            [[KeyboardButton("Compartir mi número", request_contact=True)]], one_time_keyboard=True, resize_keyboard=True))
+        await _reply(update, textos.PEDIR_TELEFONO, reply_markup=_share_phone())
     elif info["estado"] == "real":
         context.user_data["codigo_pendiente"] = True
         await _reply(update, format_call(info))
@@ -489,8 +497,7 @@ async def _confirm_code(update: Update, context: ContextTypes.DEFAULT_TYPE, code
         return
     if info["estado"] == "falta_telefono":
         context.user_data["codigo_por_confirmar"] = code
-        await _reply(update, textos.PEDIR_TELEFONO, reply_markup=ReplyKeyboardMarkup(
-            [[KeyboardButton("Compartir mi número", request_contact=True)]], one_time_keyboard=True, resize_keyboard=True))
+        await _reply(update, textos.PEDIR_TELEFONO, reply_markup=_share_phone())
         return
     await _reply(update, format_code(info))
 
@@ -559,8 +566,7 @@ async def _review(update: Update, context: ContextTypes.DEFAULT_TYPE, reason: st
         return
     if info["estado"] == "falta_telefono":
         context.user_data["motivo_pendiente"] = reason
-        await _reply(update, esc("Para saber que el número es tuyo, compártelo con el botón."), reply_markup=ReplyKeyboardMarkup(
-            [[KeyboardButton("Compartir mi número", request_contact=True)]], one_time_keyboard=True, resize_keyboard=True))
+        await _reply(update, esc("Para saber que el número es tuyo, compártelo con el botón."), reply_markup=_share_phone())
         return
     context.user_data["modo"] = None
     if info["estado"] == "en_revision":
@@ -674,8 +680,7 @@ async def _answer_invitation(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await _reply(update, join(
             f"{esc('Para confirmar que eres tú, toca')} {b('Compartir mi número')}{esc('.')}",
             esc("Solo lo uso para esta validación y lo guardo protegido."),
-        ), reply_markup=ReplyKeyboardMarkup([[KeyboardButton("Compartir mi número", request_contact=True)]],
-                                            one_time_keyboard=True, resize_keyboard=True))
+        ), reply_markup=_share_phone())
         return
     try:
         info = await _api(context).post("/bot/circulo/aceptar", json=_who(update) | {"token": token, "acepta": False})

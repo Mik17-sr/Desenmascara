@@ -414,3 +414,20 @@ def test_a_call_an_entity_registered_says_answer_and_ask_for_the_code():
     message = format_number(info)
     assert message.startswith("🟢 *CONTESTA Y PIDE EL CÓDIGO*") and "hace 2 minutos" in message and "`0 3 4 6`" in message
     assert_valid_markdown(message)
+
+
+def test_typing_the_number_during_a_check_asks_for_the_button():
+    api = FakeApi({})
+    update, context = fake("313 389 8638", api)
+    context.user_data["llamada_pendiente"] = "Desenmascara"
+    asyncio.run(handlers.on_text(update, context))
+    assert api.calls == [] and replies(update) == [textos.USA_EL_BOTON]
+    assert update.effective_message.reply_text.call_args.kwargs["reply_markup"].keyboard[0][0].request_contact
+
+
+def test_a_shared_number_with_nothing_waiting_offers_the_next_step():
+    api = FakeApi({"/bot/telefono": {"ok": True}, "/bot/entidades": {"entidades": ["Desenmascara"]}})
+    update, context = fake(None, api, contact=SimpleNamespace(user_id=1, phone_number="+57 313 389 8638"))
+    asyncio.run(handlers.on_contact(update, context))
+    last = update.effective_message.reply_text.call_args
+    assert "toca la entidad" in last.args[0] and last.kwargs["reply_markup"].inline_keyboard[0][0].callback_data == "ent:Desenmascara"

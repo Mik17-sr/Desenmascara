@@ -36,7 +36,13 @@ PEDIR_ENTIDAD = join(
 )
 PEDIR_TELEFONO = join(
     esc("Para preguntarle a la entidad necesito saber a qué número te están llamando."),
-    f"{esc('Toca')} {b('Compartir mi número')}{esc('. Solo lo uso para esta verificación y lo guardo protegido.')}",
+    f"{esc('Toca el botón')} {b('Compartir mi número')} {esc('que apareció abajo, donde escribes. Solo lo uso para esta verificación y lo guardo protegido.')}",
+    esc("En el computador, si no lo ves, toca el ícono del teclado ⌨ junto al campo de escribir."),
+)
+# Typing the number is not enough: only the button lets Telegram confirm that it is the person's own.
+USA_EL_BOTON = join(
+    f"{esc('Escribirlo no me sirve: necesito que toques el botón')} {b('Compartir mi número')}{esc('.')}",
+    esc("Así Telegram me confirma que ese número es tuyo, y nadie más puede ver las llamadas que te registran."),
 )
 PEDIR_NUMERO = join(
     b("¿Contesto o no?"),
