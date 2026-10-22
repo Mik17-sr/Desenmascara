@@ -87,6 +87,16 @@ export type AlertaMarca = {
   marca: string; dias: number; mensajes: number; hoy: number; ultimo: string | null; modalidades: string[]; dominios: string[];
   ejemplo: string | null;
 };
+export type CampanasEquipo = {
+  campanas: { id: string; nombre: string; modalidad: string | null; reportes: number; estado: string; regla: boolean; regla_automatica: boolean;
+    descripcion: string | null; revisada_por: string | null; primero: string; ultimo: string; ejemplo: string }[];
+  regla_automatica: number;
+  modalidades: Record<string, string>;
+};
+export type CasoTraza = {
+  referencia: string; estado: string; nivel: string; categoria: string | null; texto?: string;
+  eventos: { cuando: string; paso: string; detalle: string }[];
+};
 export type Health = { status: string; version: string; base_de_datos: string; ia: string; demo?: boolean };
 
 export function health(): Promise<Health> {

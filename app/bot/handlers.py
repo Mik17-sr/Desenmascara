@@ -24,8 +24,8 @@ from telegram.ext import ContextTypes
 from app.bot import textos
 from app.bot.api import IMAGE_TIMEOUT, VOICE_TIMEOUT, Api, ApiError
 from app.bot.formatters import (
-    b, code, esc, format_analysis, format_call, format_code, format_heard, format_kit, format_not_connected, format_number, format_report,
-    header, join,
+    b, case_reference, code, esc, format_analysis, format_call, format_case, format_cases, format_code, format_heard, format_kit,
+    format_not_connected, format_number, format_report, header, it, join,
 )
 from app.core.security import normalize_phone
 from app.engine.enlaces import registered_domain
@@ -40,6 +40,7 @@ CIRCLE_TIMEOUT_SECONDS = 300
 COLOMBIA = timezone(timedelta(hours=-5))
 CALL_QUESTION = re.compile(r"(?i)\bme\s+est[aá]n?\s+llamando\b|\bme\s+llam(?:a|ó|o|aron|an)\b|\bes\s+real\s+(?:la|esta)\s+llamada\b")
 CODE = re.compile(r"(?<!\d)(\d{4})(?!\d)")
+CASE_REF = re.compile(r"(?i)\bDSM-?[0-9a-f]{8}\b")
 YA_CAI = re.compile(r"(?i)\bya\s+ca[ií]\b|\bme\s+estafaron\b|\bquiero\s+denunciar\b")
 GREETINGS = {"hola", "buenas", "buenos dias", "buenas tardes", "buenas noches", "menu", "inicio", "empezar"}
 THANKS = {"gracias", "muchas gracias", "ok", "listo", "vale", "perfecto", "dale"}
@@ -132,6 +133,12 @@ async def kit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await _send_kit(update, context)
 
 
+async def case_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/caso DSM-1A2B3C4D: the trace of one case; /caso alone: the latest ones."""
+    if await _ensure_consent(update, context):
+        await _show_case(update, context, " ".join(context.args or []))
+
+
 async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not await _ensure_consent(update, context):
         return
@@ -164,7 +171,16 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     simple = plain(text).strip(" ¡!¿?.")
     modo = context.user_data.get("modo")
-    if simple in GREETINGS:
+    if context.user_data.get("pregunta_circulo"):  # an invited relative answering the pregunta de confidencialidad
+        await _answer_secret(update, context, text)
+    elif modo == "circulo_pregunta":
+        await _ask_secret_answer(update, context, text)
+    elif modo == "circulo_respuesta":
+        await _invite(update, context, context.user_data.get("familiar_nombre") or "tu familiar",
+                      context.user_data.get("familiar_telefono") or "", context.user_data.get("familiar_pregunta"), text)
+    elif CASE_REF.search(text) and len(text) <= 40:
+        await _show_case(update, context, text)
+    elif simple in GREETINGS:
         await show_menu(update, context)
     elif simple in THANKS:
         await _reply(update, esc("¡Con gusto! Si te llega algo raro, envíamelo."))
@@ -178,7 +194,7 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     elif modo == "circulo_nombre":
         await _ask_relative_phone(update, context, text)
     elif modo == "circulo_telefono":
-        await _invite(update, context, context.user_data.get("familiar_nombre") or "tu familiar", text)
+        await _ask_secret(update, context, text)
     elif modo == "revision_motivo":
         await _review(update, context, text)
     elif context.user_data.get("codigo_pendiente") and CODE.search(text) and len(text) <= 60:
@@ -327,7 +343,10 @@ async def _deliver(update: Update, context: ContextTypes.DEFAULT_TYPE, out: dict
         buttons.append(Btn("Kit de denuncia", callback_data="kit"))
     if tipo == "compra":
         buttons.append(Btn("¿Cómo compro seguro?", callback_data="seguro"))
-    await _reply(update, message, reply_markup=InlineKeyboardMarkup([buttons]) if buttons else None)
+    rows = [buttons] if buttons else []
+    if result.risk_level.value in ("high", "medium") and result.verification_id:
+        rows.append([Btn("🗂 Seguimiento del caso", callback_data=f"caso:{case_reference(result.verification_id)}")])
+    await _reply(update, message, reply_markup=InlineKeyboardMarkup(rows) if rows else None)
 
     name = update.effective_user.first_name or "Tu familiar"
     for chat_id in out.get("avisar_familiares") or []:
@@ -346,13 +365,19 @@ async def _ask_circle(update: Update, context: ContextTypes.DEFAULT_TYPE, questi
     words = set(re.findall(r"\w+", plain(text)))
     mentioned = [n for n in names if plain(n).split()[0] in words]
     who = ", ".join(names)
+    # The pregunta de confidencialidad of the relative it claims to be: whoever writes cannot know the answer.
+    secret = next((q for q in questions if q.get("pregunta") and (not mentioned or q["nombre"] in mentioned)), None)
+    reminder = (f"🔐 {esc('Hazle la pregunta de confidencialidad de ' + secret['nombre'] + ':')} {it(secret['pregunta'])} "
+                f"{esc('Si no sabe la respuesta, es una estafa.')}" if secret
+                else esc("Con IA se puede clonar la voz: si te llaman, pregunta la palabra clave que acordaron en familia."))
     await _reply(update, join(
         header(result.risk_level.value, result.risk_score, result.category) if result else f"🟡 {b('SOSPECHOSO')}",
         (f"{esc('Dice ser')} {b(mentioned[0])}{esc(', que está en tu Círculo.')}" if mentioned
          else esc("Tiene el patrón del falso familiar: alguien que dice ser de tu familia y pide dinero.")),
         esc(f"Le estoy preguntando a {who} en su Telegram."),
         b("Mientras tanto, no transfieras."),
-        esc("Con IA se puede clonar la voz: si te llaman, pregunta la palabra clave que acordaron en familia."),
+        reminder,
+        f"🗂 {esc('Caso')} {code(case_reference(result.verification_id))}" if result and result.verification_id else None,
     ))
     protegido = update.effective_user.first_name or "Tu familiar"
     for q in questions:
@@ -414,27 +439,66 @@ async def _ask_relative_phone(update: Update, context: ContextTypes.DEFAULT_TYPE
     ))
 
 
-async def _invite(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str, phone: str) -> None:
+async def _ask_secret(update: Update, context: ContextTypes.DEFAULT_TYPE, phone: str) -> None:
+    """After the number, the pregunta de confidencialidad: something only the real relative can answer."""
     if normalize_phone(phone) is None:
         await _reply(update, esc("No reconocí ese número. Escríbelo con todos sus dígitos, por ejemplo 310 000 0000."))
         return
+    name = context.user_data.get("familiar_nombre") or "tu familiar"
+    context.user_data["familiar_telefono"] = phone
+    context.user_data["modo"] = "circulo_pregunta"
+    await _reply(update, join(
+        f"🔐 {b('Pregunta de confidencialidad')} {esc('(recomendada)')}",
+        f"{esc('Escribe una pregunta que solo')} {b(name)} {esc('sepa responder, por ejemplo:')} "
+        f"{it('¿Cómo se llamaba nuestra primera mascota?')}",
+        esc(f"{name} tendrá que responderla para entrar, y si alguien te escribe diciendo ser {name}, te recordaré hacérsela."),
+    ), reply_markup=InlineKeyboardMarkup([[Btn("Sin pregunta", callback_data="c_nopreg")]]))
+
+
+async def _ask_secret_answer(update: Update, context: ContextTypes.DEFAULT_TYPE, question: str) -> None:
+    question = question.strip()[:160]
+    if len(question) < 6:
+        await _reply(update, esc("Escribe la pregunta completa, por ejemplo: ¿En qué barrio vivíamos cuando eras niño?"))
+        return
+    context.user_data["familiar_pregunta"] = question
+    context.user_data["modo"] = "circulo_respuesta"
+    await _reply(update, join(
+        f"{esc('¿Y cuál es la')} {b('respuesta')}{esc('?')}",
+        esc("La guardo como una huella que nadie puede leer, ni siquiera el equipo, y borro tu mensaje del chat."),
+    ))
+
+
+async def _invite(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str, phone: str, question: str | None = None,
+                  answer: str | None = None) -> None:
+    if normalize_phone(phone) is None:
+        await _reply(update, esc("No reconocí ese número. Escríbelo con todos sus dígitos, por ejemplo 310 000 0000."))
+        return
+    body = _who(update) | {"familiar": name[:60], "telefono": phone}
+    if question and answer:
+        body |= {"pregunta": question, "respuesta": answer[:80]}
+        try:  # the answer should not stay on the screen of this chat
+            await update.effective_message.delete()
+        except TelegramError:
+            logger.info("Could not delete the secret answer")
     try:
-        out = await _api(context).post("/bot/circulo/invitar", json=_who(update) | {"familiar": name[:60], "telefono": phone})
+        out = await _api(context).post("/bot/circulo/invitar", json=body)
     except ApiError as error:
-        if error.status == 422:  # their own number, or one that does not read as a phone
+        if error.status == 422:  # their own number, one that does not read as a phone, or a question without answer
             await _reply(update, esc(error.detail))
             return
         await _api_error(update, context, error)
         return
     context.user_data["modo"] = None
-    context.user_data.pop("familiar_nombre", None)
+    for key in ("familiar_nombre", "familiar_telefono", "familiar_pregunta"):
+        context.user_data.pop(key, None)
     link = f"https://t.me/{context.bot.username}?start=c_{out['token']}"
+    steps = f"compartir su número {out['telefono']}" + (", responder tu pregunta de confidencialidad" if out.get("con_pregunta") else "")
     await _reply(update, join(
         f"{esc('Listo. Reenvíale este enlace a')} {b(name)}{esc(':')}",
         esc(link),
         esc(f"Vence en {out['vence_en_horas']} horas y sirve una sola vez."),
-        f"{b('Validación:')} {esc(f'para aceptar, {name} tendrá que compartir su número')} {code(out['telefono'])} "
-        f"{esc('y después tú confirmarás que es tu familiar. Si alguien más abre el enlace, no podrá entrar.')}",
+        f"{b('Validación:')} {esc(f'para aceptar, {name} tendrá que {steps} y después tú confirmarás que es tu familiar. ')}"
+        f"{esc('Si alguien más abre el enlace, no podrá entrar.')}",
     ))
 
 
@@ -662,6 +726,12 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     elif data == "c_add":
         context.user_data["modo"] = "circulo_nombre"
         await _reply(update, textos.PEDIR_FAMILIAR)
+    elif data == "c_nopreg":
+        await query.edit_message_reply_markup(None)
+        if context.user_data.get("familiar_telefono"):
+            await _invite(update, context, context.user_data.get("familiar_nombre") or "tu familiar", context.user_data["familiar_telefono"])
+    elif data.startswith("caso:"):
+        await _show_case(update, context, data[5:])
     elif data == "c_leave":
         await _api(context).post("/bot/circulo/salir", json=_who(update))
         await _reply(update, esc("Listo. Saliste del Círculo de Confianza."))
@@ -704,7 +774,15 @@ async def _accept_invitation(update: Update, context: ContextTypes.DEFAULT_TYPE,
         return
     context.user_data.pop("invitacion", None)
     protegido, familiar = info["protegido"], info["familiar"]
-    if info["estado"] == "por_aprobar":
+    if info["estado"] == "pregunta":
+        context.user_data["consent"] = True
+        context.user_data["pregunta_circulo"] = {"miembro_id": info["miembro_id"], "protegido": protegido}
+        await _reply(update, join(
+            f"{esc('Tu número coincide.')} {b('Último paso:')} {esc(f'{protegido} dejó una pregunta de confidencialidad para ti.')}",
+            f"🔐 {it(info['pregunta'])}",
+            esc(f"Escríbeme la respuesta. Tienes {info['intentos']} intentos."),
+        ), reply_markup=ReplyKeyboardRemove())
+    elif info["estado"] == "por_aprobar":
         context.user_data["consent"] = True
         await _reply(update, esc(f"Gracias: tu número coincide. Le pedí a {protegido} que confirme que eres tú; te aviso apenas lo haga."),
                      reply_markup=ReplyKeyboardRemove())
@@ -728,6 +806,56 @@ async def _accept_invitation(update: Update, context: ContextTypes.DEFAULT_TYPE,
     else:  # an invitation from before the validation by number
         await _reply(update, esc(f"Esta invitación es anterior a la validación por número. Pídele a {protegido} que te invite de nuevo."),
                      reply_markup=ReplyKeyboardRemove())
+
+
+async def _answer_secret(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
+    pending = context.user_data["pregunta_circulo"]
+    try:
+        info = await _api(context).post("/bot/circulo/pregunta", json=_who(update) | {"miembro_id": pending["miembro_id"],
+                                                                                  "respuesta": text[:80]})
+    except ApiError as error:
+        context.user_data.pop("pregunta_circulo", None)
+        if error.status == 404:
+            await _reply(update, esc("Esa validación ya no está pendiente. Pídele a tu familiar que te invite de nuevo."))
+            return
+        await _api_error(update, context, error)
+        return
+    protegido, familiar = info["protegido"], info["familiar"]
+    if info["estado"] == "incorrecta":
+        await _reply(update, esc(f"Esa no es la respuesta. Te quedan {plural_tries(info['restantes'])}."))
+        return
+    context.user_data.pop("pregunta_circulo", None)
+    if info["estado"] == "bloqueada":
+        await _reply(update, join(
+            f"🔴 {b('NO PUDE VALIDARTE')}",
+            esc(f"La respuesta no coincidió 3 veces, así que cancelé la invitación. Si eres {familiar}, pídele a {protegido} que te invite de nuevo."),
+        ))
+        await _send(context, info["protegido_chat_id"], join(
+            f"⚠️ {b('INTENTO DE ENTRAR A TU CÍRCULO')}",
+            f"{esc('Quien abrió tu invitación para')} {b(familiar)} {esc('respondió mal tu pregunta de confidencialidad 3 veces.')}",
+            esc(f"No lo agregué y cancelé la invitación. Si no era {familiar}, puede ser un intento de estafa: llama a {familiar} a su número de siempre."),
+        ))
+        return
+    await _reply(update, esc(f"¡Correcto! Le pedí a {protegido} que confirme que eres tú; te aviso apenas lo haga."))
+    await _send(context, info["protegido_chat_id"], join(
+        f"🔐 {b('VALIDAR FAMILIAR')}",
+        f"{b(familiar)} {esc('aceptó tu invitación desde el número que me diste y respondió bien tu pregunta de confidencialidad.')}",
+        b(f"¿Es de verdad {familiar}?"),
+    ), reply_markup=InlineKeyboardMarkup([[Btn(f"Sí, es {familiar}", callback_data=f"apr:{info['miembro_id']}:1"),
+                                           Btn("No lo conozco", callback_data=f"apr:{info['miembro_id']}:0")]]))
+
+
+def plural_tries(count: int) -> str:
+    return "1 intento" if count == 1 else f"{count} intentos"
+
+
+async def _show_case(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str | None) -> None:
+    try:
+        info = await _api(context).post("/bot/caso", json=_who(update) | {"referencia": text or None})
+    except ApiError as error:
+        await _api_error(update, context, error)
+        return
+    await _reply(update, format_case(info) if info["encontrado"] else format_cases(info))
 
 
 async def _approve(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str) -> None:

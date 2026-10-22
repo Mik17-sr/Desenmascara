@@ -110,7 +110,8 @@ AYUDA = join(
     esc("• Reenvíame un mensaje, una captura o pega un texto."),
     esc("• Pega un número que te llamó o envíame una nota de voz contando la llamada."),
     esc("• Escribe «¿BancoAndino me está llamando?» para confirmar con la entidad."),
-    esc("• /circulo: tu Círculo de Confianza · /kit: kit de denuncia · /revision: si tu número aparece reportado por error · /borrar: borrar tus datos."),
+    esc("• /circulo: tu Círculo de Confianza · /kit: kit de denuncia · /caso: seguimiento de tus casos · /revision: si tu número aparece "
+        "reportado por error · /borrar: borrar tus datos."),
     esc("No abras enlaces por precaución y quita del mensaje los datos personales que no hagan falta."),
 )
 NO_SOPORTADO = esc("Por ahora reviso mensajes, capturas, números y notas de voz.")

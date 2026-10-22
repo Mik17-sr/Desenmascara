@@ -7,10 +7,10 @@ from telegram.error import BadRequest
 
 from app.bot import client, handlers, textos
 from app.bot.formatters import (
-    block, format_analysis, format_call, format_code, format_heard, format_kit, format_not_connected, format_number, format_report,
-    relato,
+    block, format_analysis, format_call, format_case, format_cases, format_code, format_heard, format_kit, format_not_connected,
+    format_number, format_report, relato,
 )
-from app.schemas.contract import AnalysisResult, SignalItem, SignalSource
+from app.schemas.contract import AnalysisResult, CampaignMatch, SignalItem, SignalSource, Trend
 
 # MarkdownV2 reserved characters, except "*" and "_", which the formatters use as markup.
 RESERVED = set("[]()~`>#+-=|{}.!")
@@ -52,6 +52,15 @@ KIT = {"nivel": "high", "puntaje": 100, "categoria": "Posible cobranza falsa", "
 
 SIGNAL = SignalItem(code="ENLACE_IMITA_OFICIAL", label="El enlace no es la página oficial de BancoAndino.",
                     evidence="bancoandino-seguro.co", source=SignalSource.ENLACES, points=30)
+CAMPAIGN = CampaignMatch(campaign_id="c1", name="Falso Credivalores · «descuento de deuda»", similarity_pct=92, total_reports_today=2,
+                         total_reports=14, confirmed=True,
+                         description="Ofrecen un descuento (70 %) para quedar a paz y salvo y piden pagar por WhatsApp. No es la empresa.")
+TREND = Trend(modalidad="cobro_falso", category="Posible cobranza falsa", cases_week=12,
+              description="Cobra una deuda con descuento o amenazas y pide pagar por un canal del mismo mensaje.")
+CASE = {"referencia": "DSM-1A2B3C4D", "estado": "Reportado al Banco de números · parte de una campaña", "nivel": "high",
+        "eventos": [{"cuando": "22/10/2026 3:05 p. m.", "paso": "Recibido", "detalle": "Mensaje por Telegram."},
+                    {"cuando": "22/10/2026 3:05 p. m.", "paso": "Analizado", "detalle": "🔴 Alto riesgo · 92/100 · Posible cobranza falsa · en 1,2 s."},
+                    {"cuando": "22/10/2026 3:06 p. m.", "paso": "Reportado al Banco de números", "detalle": "+57 304 ••• 2062 (1)."}]}
 
 
 @pytest.mark.parametrize("message", [
@@ -72,6 +81,12 @@ SIGNAL = SignalItem(code="ENLACE_IMITA_OFICIAL", label="El enlace no es la pági
     format_number({"encontrado": False}),
     format_number({"encontrado": True, "estado": "en_revision", "nivel": 40, "personas": 2, "reportes": 2}),
     format_report([{"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 3}]),
+    format_analysis(result(signals=[SIGNAL], campaign=CAMPAIGN, verification_id="1a2b3c4d-0000-4000-8000-000000000000")),
+    format_analysis(result("medium", 55, signals=[SIGNAL], trend=TREND, verification_id="1a2b3c4d-0000-4000-8000-000000000000")),
+    format_case(CASE),
+    format_cases({"encontrado": False, "referencia": "DSM-FFFFFFFF", "recientes": [
+        {"referencia": "DSM-1A2B3C4D", "cuando": "22/10/2026 3:05 p. m.", "nivel": "high", "categoria": "Posible cobranza falsa", "tipo": "Mensaje"}]}),
+    format_cases({"encontrado": False, "referencia": None, "recientes": []}),
     format_report([{"nuevo": True, "valor": "systemgroup.info", "personas": 1}, {"nuevo": False, "valor": "+57 320 ••• 1234", "personas": 2}]),
     format_report([{"nuevo": False, "valor": "+57 320 ••• 1234", "personas": 2}]),
     format_kit(KIT, textos.LINEAS_DENUNCIA),
@@ -275,7 +290,7 @@ def test_falso_familiar_asks_the_real_relative():
     api = FakeApi({"/bot/analizar": analysis})
     update, context = fake("Hola ma, soy Juan, cambié de número. Mándame plata urgente", api)
     asyncio.run(handlers.on_text(update, context))
-    assert "Dice ser" in replies(update)[0] and "Juan" in replies(update)[0]
+    assert "Dice ser" in replies(update)[0] and "Juan" in replies(update)[0] and "palabra clave" in replies(update)[0]
     chat_id, question = context.bot.send_message.call_args.args
     assert chat_id == 5010 and "¿Fuiste tú?" in question
     context.job_queue.run_once.assert_called_once()
@@ -293,18 +308,90 @@ def test_relative_says_no_and_the_circle_is_alerted():
 
 # --- Validating the relative who accepts a Círculo invitation -----------------------------------
 
-def test_adding_a_relative_asks_for_their_number():
-    api = FakeApi({"/bot/circulo/invitar": lambda body: {"token": "tok", "telefono": "+57 310 ••• 4567", "vence_en_horas": 48}})
-    update, context = fake("Rosa", api)
+INVITED = {"token": "tok", "telefono": "+57 310 ••• 4567", "vence_en_horas": 48}
+
+
+def test_adding_a_relative_asks_for_their_number_and_a_confidentiality_question():
+    api = FakeApi({"/bot/circulo/invitar": lambda body: INVITED | {"con_pregunta": bool(body.get("pregunta"))}})
+    update, context = fake("Juan", api)
+    update.effective_message.delete = AsyncMock()
     context.user_data["modo"] = "circulo_nombre"
     asyncio.run(handlers.on_text(update, context))
-    assert "número de celular de *Rosa*" in replies(update)[0] and context.user_data["modo"] == "circulo_telefono"
+    assert "número de celular de *Juan*" in replies(update)[0] and context.user_data["modo"] == "circulo_telefono"
     update.effective_message.text = "310 123 4567"
     asyncio.run(handlers.on_text(update, context))
-    assert api.calls[-1] == ("/bot/circulo/invitar", {"telegram_id": 1, "chat_id": 10, "nombre": "Rosa", "familiar": "Rosa", "telefono": "310 123 4567"})
+    assert "Pregunta de confidencialidad" in replies(update)[-1] and context.user_data["modo"] == "circulo_pregunta"
+    update.effective_message.text = "¿Cómo se llamaba nuestro primer perro?"
+    asyncio.run(handlers.on_text(update, context))
+    assert "respuesta" in replies(update)[-1] and context.user_data["modo"] == "circulo_respuesta"
+    update.effective_message.text = "Firulais"
+    asyncio.run(handlers.on_text(update, context))
+    assert api.calls[-1] == ("/bot/circulo/invitar", {"telegram_id": 1, "chat_id": 10, "nombre": "Rosa", "familiar": "Juan",
+                                                      "telefono": "310 123 4567", "pregunta": "¿Cómo se llamaba nuestro primer perro?",
+                                                      "respuesta": "Firulais"})
+    update.effective_message.delete.assert_awaited_once()  # the answer does not stay on the screen
     message = replies(update)[-1]
-    assert "start\\=c\\_tok" in message and "Vence en 48 horas" in message and "`+57 310 ••• 4567`" in message
-    assert context.user_data["modo"] is None
+    assert "start\\=c\\_tok" in message and "Vence en 48 horas" in message and "responder tu pregunta de confidencialidad" in message
+    assert context.user_data["modo"] is None and "familiar_pregunta" not in context.user_data
+
+
+def test_a_relative_can_be_invited_without_a_question():
+    api = FakeApi({"/bot/circulo/invitar": INVITED | {"con_pregunta": False}})
+    update, context = fake(None, api)
+    context.user_data.update({"modo": "circulo_pregunta", "familiar_nombre": "Juan", "familiar_telefono": "310 123 4567"})
+    update.callback_query = SimpleNamespace(data="c_nopreg", answer=AsyncMock(), edit_message_reply_markup=AsyncMock())
+    asyncio.run(handlers.on_button(update, context))
+    assert api.calls == [("/bot/circulo/invitar", {"telegram_id": 1, "chat_id": 10, "nombre": "Rosa", "familiar": "Juan", "telefono": "310 123 4567"})]
+    assert "+57 310 ••• 4567" in replies(update)[-1] and context.user_data["modo"] is None
+
+
+def test_the_relative_answers_the_question_before_the_protected_person_confirms():
+    answers = iter([{"estado": "incorrecta", "restantes": 2}, {"estado": "correcta", "restantes": 3}])
+    api = FakeApi({"/bot/circulo/aceptar": {"estado": "pregunta", "protegido_chat_id": 77, "protegido": "Mike", "familiar": "Rosa",
+                                            "miembro_id": "m1", "telefono": "+57 310 ••• 4567", "pregunta": "¿Primer perro?", "intentos": 3},
+                   "/bot/circulo/pregunta": lambda body: next(answers) | {"protegido_chat_id": 77, "protegido": "Mike", "familiar": "Rosa",
+                                                                          "miembro_id": "m1"}})
+    update, context = contact_update(api)
+    asyncio.run(handlers.on_contact(update, context))
+    assert "¿Primer perro?" in replies(update)[-1] and context.user_data["pregunta_circulo"]["miembro_id"] == "m1"
+    context.bot.send_message.assert_not_called()  # the protected person is asked only after the right answer
+    update.effective_message.text = "Toby"
+    asyncio.run(handlers.on_text(update, context))
+    assert "Te quedan 2 intentos" in replies(update)[-1]
+    update.effective_message.text = "Firulais"
+    asyncio.run(handlers.on_text(update, context))
+    assert api.calls[-1] == ("/bot/circulo/pregunta", {"telegram_id": 1, "chat_id": 10, "nombre": "Rosa", "miembro_id": "m1", "respuesta": "Firulais"})
+    chat_id, message = context.bot.send_message.call_args.args
+    assert chat_id == 77 and "respondió bien tu pregunta de confidencialidad" in message
+    assert context.bot.send_message.call_args.kwargs["reply_markup"].inline_keyboard[0][0].callback_data == "apr:m1:1"
+    assert "pregunta_circulo" not in context.user_data
+
+
+def test_three_wrong_answers_cancel_and_warn_the_protected_person():
+    api = FakeApi({"/bot/circulo/pregunta": {"estado": "bloqueada", "restantes": 0, "protegido_chat_id": 77, "protegido": "Mike",
+                                             "familiar": "Rosa", "miembro_id": "m1"}})
+    update, context = fake("Toby", api)
+    context.user_data["pregunta_circulo"] = {"miembro_id": "m1", "protegido": "Mike"}
+    asyncio.run(handlers.on_text(update, context))
+    assert "NO PUDE VALIDARTE" in replies(update)[-1]
+    chat_id, message = context.bot.send_message.call_args.args
+    assert chat_id == 77 and "respondió mal tu pregunta de confidencialidad 3 veces" in message
+
+
+def test_a_case_reference_shows_its_trace():
+    api = FakeApi({"/bot/caso": {"encontrado": True} | CASE})
+    update, context = fake("dsm-1a2b3c4d", api)
+    asyncio.run(handlers.on_text(update, context))
+    assert api.calls == [("/bot/caso", {"telegram_id": 1, "chat_id": 10, "nombre": "Rosa", "referencia": "dsm-1a2b3c4d"})]
+    assert "CASO DSM\\-1A2B3C4D" in replies(update)[0] and "Reportado al Banco de números" in replies(update)[0]
+
+
+def test_a_risky_result_carries_its_case_and_how_the_scam_spreads():
+    message = format_analysis(result(signals=[SIGNAL], campaign=CAMPAIGN, verification_id="1a2b3c4d-0000-4000-8000-000000000000"))
+    assert "Campaña identificada por Desenmascara" in message and "`DSM-1A2B3C4D`" in message and "14 veces" in message
+    trend = format_analysis(result("medium", 55, signals=[SIGNAL], trend=TREND))
+    assert "Se ha popularizado" in trend and "12 casos" in trend
+    assert "DSM" not in format_analysis(result("low", 0, summary="No encontramos señales de estafa.", verification_id="1a2b3c4d"))
 
 
 def contact_update(api, phone="+57 310 123 4567"):
@@ -431,3 +518,13 @@ def test_a_shared_number_with_nothing_waiting_offers_the_next_step():
     asyncio.run(handlers.on_contact(update, context))
     last = update.effective_message.reply_text.call_args
     assert "toca la entidad" in last.args[0] and last.kwargs["reply_markup"].inline_keyboard[0][0].callback_data == "ent:Desenmascara"
+
+
+def test_the_falso_familiar_alert_reminds_the_confidentiality_question():
+    analysis = {"resultado": result("high", 80, modalidad="falso_familiar").model_dump(mode="json"),
+                "preguntas_circulo": [{"aviso_id": "a1", "chat_id": 5010, "nombre": "Juan", "pregunta": "¿Cómo se llamaba nuestro primer perro?"}],
+                "avisar_familiares": []}
+    update, context = fake("Hola ma, soy Juan, cambié de número. Mándame plata urgente", FakeApi({"/bot/analizar": analysis}))
+    asyncio.run(handlers.on_text(update, context))
+    assert "pregunta de confidencialidad de Juan" in replies(update)[0] and "primer perro" in replies(update)[0]
+    assert_valid_markdown(replies(update)[0])

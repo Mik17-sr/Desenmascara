@@ -59,6 +59,16 @@ class CampaignMatch(BaseModel):
     name: str
     similarity_pct: int
     total_reports_today: int
+    total_reports: int = 0
+    confirmed: bool = Field(default=False, description="Identificada por el equipo de Desenmascara: es una regla")
+    description: Optional[str] = Field(default=None, description="Cómo funciona, escrito por el equipo")
+
+class Trend(BaseModel):
+    """A modalidad that is spreading: the bot says so and describes it."""
+    modalidad: str
+    category: str
+    cases_week: int
+    description: str
 
 class AnalysisResult(BaseModel):
     risk_level: RiskLevel
@@ -71,6 +81,7 @@ class AnalysisResult(BaseModel):
     links: List[LinkAnalysis] = Field(default_factory=list)
     recognized: List[str] = Field(default_factory=list, description="Lo que reconoció: enlaces, entidad, qué pide")
     campaign: Optional[CampaignMatch] = None
+    trend: Optional[Trend] = None
     extracted_text: Optional[str] = Field(default=None, description="Texto leído de la captura o de la nota de voz")
     limitations: List[str] = Field(default_factory=list)
     verification_id: Optional[str] = None

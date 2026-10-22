@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.engine import archivista, enlaces, oficiales, pistas as pistas_mod
 from app.engine.analyzer import INJECTION_PATTERN, MAX_MODEL_CHARS, classify
-from app.engine.juez import Evidencia, judge
-from app.schemas.contract import AnalysisInput, AnalysisResult
+from app.engine.juez import MODALIDADES, Evidencia, judge
+from app.schemas.contract import AnalysisInput, AnalysisResult, RiskLevel, Trend
 from app.services import banco, entidades, verificaciones
 
 
@@ -54,6 +54,12 @@ async def analyze(session: AsyncSession, payload: AnalysisInput) -> tuple[Analys
         ia_consultada=settings.IA_LOCAL and not injection, inyeccion=injection, campana=await verificaciones.best_campaign(session, huella), banco=hits,
     )
     result = judge(evidencia)
+    if result.modalidad in MODALIDADES and result.modalidad != "otra" and result.risk_level in (RiskLevel.HIGH, RiskLevel.MEDIUM)             and not (result.campaign and result.campaign.confirmed):
+        # "Se ha popularizado": the same modalidad keeps arriving this week. The team's description wins when there is one.
+        cases = await verificaciones.modality_this_week(session, result.modalidad)
+        if cases >= verificaciones.TENDENCIA_MIN:
+            name, why, _ = MODALIDADES[result.modalidad]
+            result.trend = Trend(modalidad=result.modalidad, category=name, cases_week=cases, description=why)
     if len(payload.text) > MAX_MODEL_CHARS and not injection:
         result.limitations.append("El mensaje es largo: la IA leyó solo el inicio y el final.")
     result.processing_ms = round((time.perf_counter() - started) * 1000)

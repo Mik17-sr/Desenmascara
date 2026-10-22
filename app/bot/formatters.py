@@ -65,10 +65,66 @@ def format_analysis(result: AnalysisResult) -> str:
         lines.extend(f"• {esc(s.label)}" for s in reasons)
     elif level == "inconclusive":
         lines.append(esc("No pude completar el análisis en este momento."))
+    if level in ("high", "medium"):
+        lines.extend(spreading(result))
     todo = result.recommendations[0] if result.recommendations else "Verifica por otro canal antes de compartir datos o realizar pagos."
     lines.append(f"{b('Qué hacer:')} {esc(todo)}")
     if len(result.recommendations) > 1:
         lines.append(esc(result.recommendations[-1]))
+    if level in ("high", "medium") and result.verification_id:
+        lines.append(f"🗂 {esc('Caso')} {code(case_reference(result.verification_id))} {esc('· guárdalo para tu denuncia.')}")
+    return join(*lines)
+
+
+def case_reference(verification_id: str) -> str:
+    """The same reference as app/services/casos.py: the start of the check's id."""
+    return f"DSM-{verification_id.replace('-', '')[:8].upper()}"
+
+
+def spreading(result: AnalysisResult) -> list[str]:
+    """A campaign the team identified, or a modalidad that keeps arriving this week: say so and how it works."""
+    campaign, trend = result.campaign, result.trend
+    if campaign and campaign.confirmed:
+        lines = [f"📢 {b('Campaña identificada por Desenmascara:')} {esc(campaign.name)}"]
+        if campaign.description:
+            lines.append(it(campaign.description))
+        if campaign.total_reports:
+            lines.append(esc(f"La han reportado {plural(campaign.total_reports, 'vez', 'veces')}."))
+        return lines
+    if trend:
+        cases = plural(trend.cases_week, "caso", "casos")
+        return [f"📈 {b('Se ha popularizado:')} {esc(f'{cases} de «{trend.category}» esta semana en Desenmascara.')}",
+                it(trend.description)]
+    if campaign and campaign.total_reports >= 5:
+        reports = plural(campaign.total_reports, "reporte", "reportes")
+        return [f"📈 {b('Campaña en curso:')} {esc(f'ya suma {reports} de mensajes casi iguales.')}"]
+    return []
+
+
+def format_case(info: dict) -> str:
+    """Registro trazable del caso: every step, oldest first."""
+    lines = [f"🗂 {b('CASO ' + info['referencia'])}", f"{b('Estado:')} {esc(info['estado'])}", ""]
+    for event in info["eventos"]:
+        lines.append(f"• {it(event['cuando'])} · {b(event['paso'])}")
+        lines.append(f"  {esc(event['detalle'])}")
+    lines += ["", esc("Esta referencia va en tu kit de denuncia: con ella, la Policía y tu banco pueden seguir el caso.")]
+    return join(*lines)
+
+
+def format_cases(info: dict) -> str:
+    recent = info.get("recientes") or []
+    lines = []
+    if info.get("referencia"):
+        lines.append(esc(f"No encontré el caso {info['referencia']} entre los tuyos."))
+    if not recent:
+        lines.append(esc("Todavía no tienes casos: envíame un mensaje, una captura o un número y lo reviso."))
+        return join(*lines)
+    lines.append(b("Tus últimos casos"))
+    for case in recent:
+        dot = SEMAFORO.get(case["nivel"], ("⚪", ""))[0]
+        what = case["categoria"] or case["tipo"]
+        lines.append(f"{dot} {code(case['referencia'])} {esc('· ' + what + ' · ' + case['cuando'])}")
+    lines.append(esc("Toca una referencia para copiarla y escríbeme /caso con ella, por ejemplo /caso DSM-1A2B3C4D."))
     return join(*lines)
 
 

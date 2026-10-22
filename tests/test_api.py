@@ -313,3 +313,106 @@ def test_a_brand_inside_a_longer_name_is_said_once():
     assert brands_named("Banco Falabella: su tarjeta fue bloqueada") == ["Banco Falabella"]
     assert brands_named("SystemgroupyCredivalores tambienseadhierenalaferia MiDataCredito") == ["Credivalores", "SystemGroup", "Datacrédito"]
     assert brands_named("Claro que sí, nos vemos mañana") == []
+
+
+def test_the_relative_must_answer_the_confidentiality_question(client):
+    rosa = consenting(client, 600, "Rosa")
+    question = "¿Cómo se llamaba nuestro primer perro?"
+    assert client.post("/api/v1/bot/circulo/invitar", headers=BOT, json=rosa | {"familiar": "Juan", "telefono": "310 600 0601",
+                                                                                "pregunta": question}).status_code == 422
+    invited = client.post("/api/v1/bot/circulo/invitar", headers=BOT, json=rosa | {"familiar": "Juan", "telefono": "310 600 0601",
+                                                                                   "pregunta": question, "respuesta": "Firuláis"}).json()
+    assert invited["con_pregunta"] is True
+    juan = persona(601, "Juan")
+    accepted = client.post("/api/v1/bot/circulo/aceptar", headers=BOT, json=juan | {"token": invited["token"], "acepta": True,
+                                                                                    "telefono": "+573106000601"}).json()
+    assert accepted["estado"] == "pregunta" and accepted["pregunta"] == question
+    seen = client.post("/api/v1/bot/circulo/ver", json=rosa, headers=BOT).json()
+    assert seen["por_aprobar"] == [] and seen["pendientes"] == ["Juan (falta la pregunta)"]
+
+    answer = {"miembro_id": accepted["miembro_id"]}
+    intruso = persona(602, "Intruso")
+    assert client.post("/api/v1/bot/circulo/pregunta", headers=BOT, json=intruso | answer | {"respuesta": "firulais"}).status_code == 404
+    wrong = client.post("/api/v1/bot/circulo/pregunta", headers=BOT, json=juan | answer | {"respuesta": "Toby"}).json()
+    assert wrong["estado"] == "incorrecta" and wrong["restantes"] == 2
+    right = client.post("/api/v1/bot/circulo/pregunta", headers=BOT, json=juan | answer | {"respuesta": "  FIRULAIS. "}).json()
+    assert right["estado"] == "correcta" and right["protegido_chat_id"] == 6000
+    assert client.post("/api/v1/bot/circulo/ver", json=rosa, headers=BOT).json()["por_aprobar"] == [{"id": accepted["miembro_id"], "nombre": "Juan"}]
+    client.post("/api/v1/bot/circulo/aprobar", json=rosa | {"miembro_id": accepted["miembro_id"], "aprueba": True}, headers=BOT)
+
+    with fake_ai("falso_familiar", "dinero", True):
+        out = client.post("/api/v1/bot/analizar", headers=BOT, json=rosa | {
+            "texto": "Ma, soy Juan, cambié de número. Necesito $500.000 ya mismo, no le digas a nadie"}).json()
+    assert out["preguntas_circulo"][0]["pregunta"] == question  # the bot reminds Rosa to ask it
+
+
+def test_three_wrong_answers_cancel_the_invitation(client):
+    rosa = consenting(client, 610, "Rosa")
+    token = client.post("/api/v1/bot/circulo/invitar", headers=BOT, json=rosa | {"familiar": "Ana", "telefono": "310 610 0611",
+                                                                                 "pregunta": "¿Barrio de la infancia?", "respuesta": "Chapinero"}).json()["token"]
+    ana = persona(611, "Ana")
+    miembro = client.post("/api/v1/bot/circulo/aceptar", headers=BOT, json=ana | {"token": token, "acepta": True,
+                                                                                   "telefono": "3106100611"}).json()["miembro_id"]
+    states = [client.post("/api/v1/bot/circulo/pregunta", headers=BOT, json=ana | {"miembro_id": miembro, "respuesta": guess}).json()["estado"]
+              for guess in ("Suba", "Bosa", "Kennedy")]
+    assert states == ["incorrecta", "incorrecta", "bloqueada"]
+    assert client.post("/api/v1/bot/circulo/pregunta", headers=BOT, json=ana | {"miembro_id": miembro, "respuesta": "Chapinero"}).status_code == 404
+    assert client.post("/api/v1/bot/circulo/ver", json=rosa, headers=BOT).json() == {"miembros": [], "pendientes": [], "por_aprobar": []}
+
+
+def test_a_case_is_traceable_by_its_reference(client):
+    owner = consenting(client, 620, "Rosa")
+    with fake_ai("suplantacion_bancaria", "datos_personales", True):
+        out = client.post("/api/v1/bot/analizar", headers=BOT, json=owner | {"texto": PHISHING.replace("bancoandino-seguro.co", "andino-caso.co")}).json()
+    verification = out["resultado"]["verification_id"]
+    reference = "DSM-" + verification.replace("-", "")[:8].upper()
+    client.post("/api/v1/bot/reportar", headers=BOT, json=owner | {"valor": "andino-caso.co", "tipo": "enlace", "verificacion_id": verification})
+
+    case = client.post("/api/v1/bot/caso", headers=BOT, json=owner | {"referencia": reference.lower()}).json()
+    assert case["encontrado"] and case["referencia"] == reference and case["estado"].startswith("Reportado al Banco de números")
+    assert [e["paso"] for e in case["eventos"]][:2] == ["Recibido", "Analizado"] and "Reportado al Banco de números" in [e["paso"] for e in case["eventos"]]
+    # Someone else's reference is not a key to their case; without one, the person sees their own latest cases.
+    other = consenting(client, 621, "Otra")
+    assert client.post("/api/v1/bot/caso", headers=BOT, json=other | {"referencia": reference}).json()["encontrado"] is False
+    assert client.post("/api/v1/bot/caso", headers=BOT, json=owner).json()["recientes"][0]["referencia"] == reference
+    team = client.get(f"/api/v1/equipo/casos/{reference}", headers=ADMIN).json()
+    assert team["referencia"] == reference and "andino-caso.co" in team["texto"]
+    assert client.get(f"/api/v1/equipo/casos/{reference}").status_code == 401
+
+
+SUBSIDIO = ("Atención beneficiario: su Ingreso Solidario 2026 por 850000 está aprobado. Para recibirlo hoy confirme su cédula y "
+            "el número de su cuenta respondiendo este mensaje antes de las 6 de la tarde.")
+
+
+def test_the_team_turns_a_campaign_into_a_rule_the_bot_quotes(client):
+    rule = {"nombre": "Falso Ingreso Solidario 2026", "modalidad": "falso_premio", "ejemplo": SUBSIDIO,
+            "descripcion": "Dicen que un subsidio está aprobado y piden la cédula y la cuenta para «consignarlo». El Gobierno no pide datos por mensaje."}
+    assert client.post("/api/v1/equipo/campanas", json=rule).status_code == 401
+    assert client.post("/api/v1/equipo/campanas", headers=ADMIN, json=rule | {"ejemplo": "muy corto, nada más"}).status_code == 422
+    created = client.post("/api/v1/equipo/campanas", headers=ADMIN, json=rule).json()
+    assert created["regla"] is True
+
+    person = consenting(client, 630, "Luz")
+    with fake_ai("ninguna", "nada", False):  # even when the AI sees nothing, the team's rule recognizes it
+        body = client.post("/api/v1/bot/analizar", headers=BOT, json=person | {"texto": SUBSIDIO.replace("850000", "1200000")}).json()["resultado"]
+    assert body["risk_level"] == "high" and body["campaign"]["confirmed"] is True
+    assert body["campaign"]["description"] == rule["descripcion"]
+    assert any(s["code"] == "CAMPANA_IDENTIFICADA" for s in body["signals"])
+
+    listed = client.get("/api/v1/equipo/campanas", headers=ADMIN).json()
+    found = next(c for c in listed["campanas"] if c["id"] == created["id"])
+    assert found["regla"] and found["revisada_por"] == "equipo" and listed["regla_automatica"] == 5
+    renamed = client.post(f"/api/v1/equipo/campanas/{created['id']}", headers=ADMIN,
+                          json={"regla": False, "estado": "descartada", "revisada_por": "Mik"}).json()
+    assert renamed == {"id": created["id"], "nombre": rule["nombre"], "regla": False, "estado": "descartada"}
+
+
+def test_a_modality_that_keeps_arriving_is_described_as_spreading(client):
+    texts = ["Gana dinero desde casa dando likes a videos: te pagamos por tarea, solo envía el registro de 50 mil a esta cuenta.",
+             "Trabajo fácil por WhatsApp, calificas hoteles y ganas por día. Para empezar debes pagar la inscripción hoy mismo.",
+             "Oferta de empleo remoto sin experiencia: ingresos extra de 300 mil diarios. Consigna el kit de bienvenida para activar tu cuenta."]
+    person = consenting(client, 640, "Pedro")
+    with fake_ai("falso_empleo", "dinero", True):
+        bodies = [client.post("/api/v1/bot/analizar", headers=BOT, json=person | {"texto": t}).json()["resultado"] for t in texts]
+    assert bodies[-1]["trend"]["modalidad"] == "falso_empleo" and bodies[-1]["trend"]["cases_week"] >= 3
+    assert bodies[-1]["trend"]["category"] == "Falso empleo"

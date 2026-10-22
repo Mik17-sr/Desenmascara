@@ -222,7 +222,7 @@ Esta versión implementa la guía del proyecto (`docs/`, v7.0) con tres cambios:
 
 ## 12. Qué hay en el código
 
-- **Bot de Telegram** (`app/bot/`): menú de 6 opciones, detección automática (mensaje, captura, número, nota de voz, «¿X me está llamando?», «ya caí»), consentimiento (Ley 1581), Llamada Verificada, Círculo de Confianza con validación del familiar (su número y la confirmación del protegido), Antes de pagar, kit de denuncia con «Relato de los hechos» para la Policía, reportes de números y enlaces, y revisión por el dueño. En tu computador corre por *polling* (`python -m app.bot.client`); en un servidor, dentro de la API por *webhook* (`app/bot/webhook.py`).
+- **Bot de Telegram** (`app/bot/`): menú de 6 opciones, detección automática (mensaje, captura, número, nota de voz, «¿X me está llamando?», «ya caí»), consentimiento (Ley 1581), Llamada Verificada, Círculo de Confianza con validación del familiar (su número, una pregunta de confidencialidad y la confirmación del protegido), Antes de pagar, kit de denuncia con «Relato de los hechos» para la Policía, registro trazable de cada caso (`/caso`), reportes de números y enlaces, y revisión por el dueño. En tu computador corre por *polling* (`python -m app.bot.client`); en un servidor, dentro de la API por *webhook* (`app/bot/webhook.py`).
 - **El cerebro** (`app/engine/`), con las seis revisiones de la sección 11:
 
   | Revisión | Archivo | Cómo |
@@ -235,6 +235,14 @@ Esta versión implementa la guía del proyecto (`docs/`, v7.0) con tres cambios:
   | 6 · Juez | `juez.py` | Puntos y reglas de la sección 12; cada punto tiene una razón (Rayos X) |
 - **API** (`app/api/`): análisis público con límite por IP, endpoints del bot (`BOT_API_SECRET`), de las entidades (llave de acceso), del equipo (`ADMIN_API_KEY`) y vistas anónimas para el Dashboard.
 - **Dashboard** (`dashboard/`, Next.js): Radar en vivo con actividad y avisos, Verificar un mensaje con Rayos X, Banco de números y Panel de la entidad. Con Supabase se actualiza por Realtime; sin Supabase consulta cada 3 s.
+
+### Caso trazable, pregunta de confidencialidad y campañas del equipo
+
+| Qué | Cómo funciona | Dónde |
+|---|---|---|
+| **Registro trazable del caso** | Cada resultado sospechoso o de alto riesgo trae su referencia `DSM-XXXXXXXX`, la misma del kit de denuncia. Con `/caso DSM-…` (o el botón «Seguimiento del caso») la persona ve cada paso: recibido, analizado, si se unió a una campaña, qué le respondió el Círculo y qué se reportó al Banco de números. Solo ve sus propios casos. El equipo sigue cualquier caso desde el Banco de números, sin los nombres de los familiares. | `app/services/casos.py`, `/bot/caso`, `/equipo/casos/{ref}` |
+| **Pregunta de confidencialidad** | Al agregar a un familiar, el protegido escribe una pregunta que solo esa persona sabe responder («¿Cómo se llamaba nuestra primera mascota?»). La pregunta se guarda cifrada y la respuesta solo como huella, y el bot borra del chat el mensaje con la respuesta. Para entrar, el familiar comparte su número, responde la pregunta (3 intentos; al tercer error se cancela la invitación y se avisa al protegido) y el protegido confirma. Si llega un «falso familiar», el bot le recuerda al protegido hacerle esa pregunta a quien escribe. | `app/services/circulo.py`, `/bot/circulo/pregunta` |
+| **Campañas identificadas por el equipo** | En el Banco de números, con el acceso del equipo, cada campaña detectada se puede renombrar, describir y volver **regla**: el bot la reconoce sin límite de días, sube el riesgo y responde «📢 Campaña identificada por Desenmascara» con la descripción. También se crea una regla desde un mensaje de ejemplo (noticias, avisos de una entidad). Las campañas detectadas con 5 reportes o más ya funcionan como regla automática. Si una modalidad se repite 3 veces o más en la semana, la respuesta dice «📈 Se ha popularizado» y explica cómo funciona. | `app/services/verificaciones.py`, `/equipo/campanas`, `dashboard/components/equipo.tsx` |
 
 ---
 
@@ -296,7 +304,7 @@ python scripts/crear_acceso.py "Nombre de la entidad" --lista                   
 ## 14. Pasar a Supabase (RLS y Realtime)
 
 1. Crea un proyecto en [supabase.com](https://supabase.com). En **Security**: deja **Enable Data API**, quita **Automatically expose new tables** (las migraciones dan solo los permisos necesarios) y marca **Enable automatic RLS**.
-2. En **SQL Editor**, pega y ejecuta en orden `supabase/migrations/20261021120000_esquema_inicial.sql`, `supabase/migrations/20261022120000_accesos_entidad.sql` y `supabase/migrations/20261022160000_validar_familiar.sql` (o `supabase db push` con la CLI). Crean las tablas con RLS, las 5 vistas anónimas y la tabla `eventos_dashboard`, que ya queda publicada en Realtime.
+2. En **SQL Editor**, pega y ejecuta en orden `supabase/migrations/20261021120000_esquema_inicial.sql`, `supabase/migrations/20261022120000_accesos_entidad.sql`, `supabase/migrations/20261022160000_validar_familiar.sql` y `supabase/migrations/20261022220000_casos_preguntas_campanas.sql` (o `supabase db push` con la CLI). Crean las tablas con RLS, las 5 vistas anónimas y la tabla `eventos_dashboard`, que ya queda publicada en Realtime.
 3. En **Connect → Connection String**, con **Method: Session pooler**, copia la cadena, cambia `[YOUR-PASSWORD]` por tu contraseña y ponla en `.env`:
    `DATABASE_URL=postgresql://postgres.<proyecto>:<contraseña>@aws-<0 o 1>-<región>.pooler.supabase.com:5432/postgres`
    Los proyectos nuevos usan `aws-1-…`. Nunca la de **Direct connection** (`db.<proyecto>.supabase.co`): solo tiene IPv6 y desde Render falla con «No address associated with hostname».

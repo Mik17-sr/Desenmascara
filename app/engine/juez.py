@@ -31,6 +31,7 @@ P_ENTIDAD = 5
 P_NO_PIDE = -15
 P_INYECCION = 20
 P_CAMPANA_MAX = 20
+P_CAMPANA_IDENTIFICADA = 30  # a campaign the team identified is a rule, not a resemblance
 P_BANCO_MAX = 25
 P_AVISO_CODIGO = -40
 P_DISFRAZADO = 20
@@ -131,6 +132,10 @@ class CampaignHit:
     nombre: str
     similitud: float
     reportes_hoy: int
+    descripcion: str | None = None
+    total: int = 0
+    confirmada: bool = False  # identified by the team (regla)
+    modalidad: str | None = None
 
 
 @dataclass
@@ -255,8 +260,15 @@ def judge(e: Evidencia) -> AnalysisResult:
     if e.campana and e.campana.similitud >= 0.6:
         points = round(P_CAMPANA_MAX * min(1.0, (e.campana.similitud - 0.6) / 0.4))
         pct = round(e.campana.similitud * 100)
-        add("CAMPANA_ACTIVA", f"Es muy parecido ({pct} %) a una campaña reportada {plural(e.campana.reportes_hoy, 'vez', 'veces')} hoy.",
-            e.campana.nombre, SignalSource.ARCHIVISTA, points)
+        if e.campana.confirmada:
+            add("CAMPANA_IDENTIFICADA", f"Coincide ({pct} %) con una campaña de estafa identificada por el equipo de Desenmascara.",
+                e.campana.nombre, SignalSource.ARCHIVISTA, max(points, P_CAMPANA_IDENTIFICADA))
+        elif e.campana.reportes_hoy:
+            add("CAMPANA_ACTIVA", f"Es muy parecido ({pct} %) a una campaña reportada {plural(e.campana.reportes_hoy, 'vez', 'veces')} hoy.",
+                e.campana.nombre, SignalSource.ARCHIVISTA, points)
+        else:
+            add("CAMPANA_ACTIVA", f"Es muy parecido ({pct} %) a una campaña que ya suma {plural(e.campana.total, 'reporte', 'reportes')}.",
+                e.campana.nombre, SignalSource.ARCHIVISTA, points)
 
     banco_alto = False
     for hit in e.banco:
@@ -293,6 +305,8 @@ def judge(e: Evidencia) -> AnalysisResult:
         # as it asks for money, a transfer or a code.
         asks_money = e.pistas.pide_dinero or (p is not None and p.pide in ("dinero", "mover_dinero", "codigo_o_clave"))
         score = max(score, 75 if asks_money else 45)
+    if e.campana and e.campana.confirmada and e.campana.similitud >= 0.7:
+        score = max(score, 75)  # rule: the team identified this campaign and the message is almost the same
     if cobro:
         score = max(score, 40)  # rule: an unrequested collection with threats or discounts is verified before paying
     if aviso_de_codigo and not banco_alto and not e.inyeccion:
@@ -326,8 +340,9 @@ def judge(e: Evidencia) -> AnalysisResult:
     signals.sort(key=lambda s: s.points, reverse=True)
     campaign = None
     if e.campana and e.campana.similitud >= 0.6:
-        campaign = CampaignMatch(campaign_id=e.campana.id, name=e.campana.nombre,
-                                 similarity_pct=round(e.campana.similitud * 100), total_reports_today=e.campana.reportes_hoy)
+        campaign = CampaignMatch(campaign_id=e.campana.id, name=e.campana.nombre, similarity_pct=round(e.campana.similitud * 100),
+                                 total_reports_today=e.campana.reportes_hoy, total_reports=e.campana.total,
+                                 confirmed=e.campana.confirmada, description=e.campana.descripcion)
     return AnalysisResult(
         risk_level=level,
         risk_score=score,

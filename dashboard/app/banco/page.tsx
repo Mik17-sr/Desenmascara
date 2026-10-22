@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
+import { CampanasDelEquipo, CasoDelEquipo } from "@/components/equipo";
 import { Activity, AlertTriangle, CheckCircle, Database, Key, Search, ShieldCheck, Users } from "@/components/icons";
 import { Button, Card, Empty, Kpi, LevelPill, Notice, PageHeader, Skeleton } from "@/components/ui";
 import { ApiError, api, postJSON, type BancoView, type Lookup } from "@/lib/api";
@@ -237,6 +238,12 @@ export default function BancoPage() {
             </Card>
           </div>
         </div>
+        {teamKey && (
+          <div className="grid items-start gap-4 lg:grid-cols-3">
+            <div className="min-w-0 lg:col-span-2"><CampanasDelEquipo teamKey={teamKey} onMessage={setMessage} onUnauthorized={signOut} /></div>
+            <CasoDelEquipo teamKey={teamKey} onUnauthorized={signOut} />
+          </div>
+        )}
         <p className="text-right text-xs text-muted">{demo ? "Datos de demostración marcados como «Demo» · " : ""}Números enmascarados para proteger la privacidad.</p>
       </div>
       {signingIn && <TeamSignIn onClose={() => setSigningIn(false)} onSignedIn={signIn} />}

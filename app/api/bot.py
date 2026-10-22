@@ -20,7 +20,7 @@ from app.engine.juez import MODALIDADES, risk_level
 from app.engine.oficiales import line_to_call, official_websites
 from app.engine.pistas import Pistas, extract
 from app.schemas.contract import AnalysisInput, AnalysisResult, RiskLevel, SignalItem, SignalSource
-from app.services import banco, circulo, entidades, llamadas, usuarios, verificaciones
+from app.services import banco, casos, circulo, entidades, llamadas, usuarios, verificaciones
 
 router = APIRouter(prefix="/bot", dependencies=[Depends(require_bot)])
 
@@ -42,6 +42,8 @@ class Pregunta(BaseModel):
     aviso_id: str
     chat_id: int
     nombre: str
+    # The pregunta de confidencialidad the protected person set for this relative: the bot reminds them to ask it.
+    pregunta: str | None = None
 
 
 class AnalizarOut(BaseModel):
@@ -96,7 +98,8 @@ async def _circle_actions(db: AsyncSession, user: Usuario, result: AnalysisResul
     if result.modalidad == "falso_familiar":
         sender = await usuarios.by_telegram(db, reenviado_de) if reenviado_de else None
         avisos = await circulo.ask(db, user, text, None, sender=sender)
-        return [Pregunta(aviso_id=str(a.id), chat_id=usuarios.chat_id_of(u), nombre=m.nombre) for a, m, u in avisos], []
+        return [Pregunta(aviso_id=str(a.id), chat_id=usuarios.chat_id_of(u), nombre=m.nombre, pregunta=circulo.question_of(m))
+                for a, m, u in avisos], []
     if result.risk_level == RiskLevel.HIGH:
         return [], [usuarios.chat_id_of(u) for u in await circulo.alert_all(db, user)]
     return [], []
@@ -260,16 +263,20 @@ class InvitarIn(Persona):
     # The relative's number: whoever accepts must share this same one through Telegram.
     telefono: str = Field(..., min_length=7, max_length=20)
     relacion: str | None = None
+    # Optional pregunta de confidencialidad and its answer (kept only as a fingerprint).
+    pregunta: str | None = Field(default=None, max_length=160)
+    respuesta: str | None = Field(default=None, max_length=80)
 
 
 @router.post("/circulo/invitar")
 async def invite(body: InvitarIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     user = await _consented(db, body)
     try:
-        token = await circulo.invite(db, user, body.familiar, body.telefono, body.relacion)
+        token = await circulo.invite(db, user, body.familiar, body.telefono, body.relacion, body.pregunta, body.respuesta)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"token": token, "telefono": _masked(body.telefono), "vence_en_horas": circulo.INVITE_HOURS}
+    return {"token": token, "telefono": _masked(body.telefono), "vence_en_horas": circulo.INVITE_HOURS,
+            "con_pregunta": bool(body.pregunta and body.pregunta.strip())}
 
 
 def _masked(raw: str | None) -> str | None:
@@ -300,10 +307,31 @@ async def accept(body: AceptarIn, db: AsyncSession = Depends(session, scope="fun
     if found is None:
         raise HTTPException(status_code=404, detail="La invitación no existe, ya se usó o venció.")
     estado, miembro, protegido = found
-    if estado == "por_aprobar":
+    if estado in ("por_aprobar", "pregunta"):
         usuarios.set_consent(user)  # accepting the Círculo is this person's consent
     return {"estado": estado, "protegido_chat_id": usuarios.chat_id_of(protegido), "protegido": protegido.nombre_corto or "Tu familiar",
-            "familiar": miembro.nombre, "miembro_id": str(miembro.id), "telefono": _masked(body.telefono)}
+            "familiar": miembro.nombre, "miembro_id": str(miembro.id), "telefono": _masked(body.telefono),
+            "pregunta": circulo.question_of(miembro) if estado == "pregunta" else None, "intentos": circulo.ANSWER_TRIES}
+
+
+class PreguntaIn(Persona):
+    miembro_id: str
+    respuesta: str = Field(..., min_length=1, max_length=80)
+
+
+@router.post("/circulo/pregunta")
+async def answer_secret(body: PreguntaIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
+    """The invited relative answers the protected person's pregunta de confidencialidad."""
+    try:
+        miembro_id = UUID(body.miembro_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Esa validación ya no está pendiente.") from exc
+    found = await circulo.answer_question(db, await _user(db, body), miembro_id, body.respuesta)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Esa validación ya no está pendiente.")
+    estado, miembro, protegido, left = found
+    return {"estado": estado, "restantes": left, "protegido_chat_id": usuarios.chat_id_of(protegido),
+            "protegido": protegido.nombre_corto or "Tu familiar", "familiar": miembro.nombre, "miembro_id": str(miembro.id)}
 
 
 class AprobarIn(Persona):
@@ -330,6 +358,21 @@ async def view_circle(persona: Persona, db: AsyncSession = Depends(session, scop
     user = await _user(db, persona)
     return {"miembros": [m.nombre for m, _ in await circulo.members(db, user)], "pendientes": await circulo.pending_names(db, user),
             "por_aprobar": [{"id": str(m.id), "nombre": m.nombre} for m in await circulo.to_approve(db, user)]}
+
+
+class CasoIn(Persona):
+    referencia: str | None = Field(default=None, max_length=40)
+
+
+@router.post("/caso")
+async def case(body: CasoIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
+    """Registro trazable: the person's own case by its reference, or their latest cases."""
+    user = await _consented(db, body)
+    ref = casos.parse(body.referencia)
+    found = await casos.find(db, ref, user) if ref else None
+    if found is None:
+        return {"encontrado": False, "referencia": f"DSM-{ref.upper()}" if ref else None, "recientes": await casos.recent(db, user)}
+    return {"encontrado": True} | await casos.trace(db, found)
 
 
 class RespuestaIn(Persona):

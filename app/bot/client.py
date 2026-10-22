@@ -86,6 +86,7 @@ def create_application(token: str, polling: bool = True) -> Application:
     application.add_handler(CommandHandler(["help", "ayuda"], handlers.help_command, filters=private))
     application.add_handler(CommandHandler("circulo", handlers.circle_command, filters=private))
     application.add_handler(CommandHandler(["kit", "denunciar"], handlers.kit_command, filters=private))
+    application.add_handler(CommandHandler(["caso", "casos"], handlers.case_command, filters=private))
     application.add_handler(CommandHandler("revision", handlers.review_command, filters=private))
     application.add_handler(CommandHandler("borrar", handlers.forget_command, filters=private))
     application.add_handler(CallbackQueryHandler(handlers.on_button))

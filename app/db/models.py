@@ -57,6 +57,12 @@ class MiembroCirculo(Base):
     # Fingerprint of the number the protected person gave for this relative: whoever accepts must share that same
     # number through Telegram, and then the protected person confirms it (app/services/circulo.py).
     telefono_hash: Mapped[str | None] = mapped_column(String(64))
+    # Optional pregunta de confidencialidad: something only the real relative can answer. The question is encrypted
+    # (the bot shows it again when someone claims to be this relative); the answer is only a fingerprint, and it is
+    # cleared once the relative answers it right. Three wrong answers cancel the invitation.
+    pregunta_cifrada: Mapped[str | None] = mapped_column(Text)
+    respuesta_hash: Mapped[str | None] = mapped_column(String(64))
+    intentos: Mapped[int | None] = mapped_column(Integer, default=0)
     acepto_at: Mapped[datetime | None] = mapped_column(DateTime)
     creado_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
@@ -85,6 +91,12 @@ class Campana(Base):
     centroide: Mapped[list] = mapped_column(JSON)
     primer_reporte_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     ultimo_reporte_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    # Identified by the team: the description the bot quotes, and regla=True turns the campaign into a rule (matched
+    # by its fingerprint with no 7-day window). Detected campaigns with enough reports act as rules on their own.
+    descripcion: Mapped[str | None] = mapped_column(Text)
+    regla: Mapped[bool | None] = mapped_column(Boolean, default=False)
+    revisada_por: Mapped[str | None] = mapped_column(String(60))
+    revisada_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class Entidad(Base):
