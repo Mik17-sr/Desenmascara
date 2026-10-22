@@ -10,10 +10,10 @@ router = APIRouter(prefix="/dashboard")
 
 
 @router.get("/radar")
-async def radar(db: AsyncSession = Depends(session)) -> dict:
+async def radar(db: AsyncSession = Depends(session, scope="function")) -> dict:
     return await dashboard.radar(db)
 
 
 @router.get("/banco")
-async def banco(db: AsyncSession = Depends(session)) -> dict:
+async def banco(db: AsyncSession = Depends(session, scope="function")) -> dict:
     return await dashboard.banco_view(db)

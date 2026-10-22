@@ -63,14 +63,14 @@ async def _consented(db: AsyncSession, persona: Persona, limiter: RateLimiter = 
 
 
 @router.post("/inicio")
-async def start(persona: Persona, db: AsyncSession = Depends(session)) -> dict:
+async def start(persona: Persona, db: AsyncSession = Depends(session, scope="function")) -> dict:
     user = await _user(db, persona)
     return {"consentimiento": user.consentimiento_at is not None, "telefono_verificado": bool(user.telefono_hash),
             "tiene_circulo": bool(await circulo.members(db, user))}
 
 
 @router.post("/consentimiento")
-async def consent(persona: Persona, db: AsyncSession = Depends(session)) -> dict:
+async def consent(persona: Persona, db: AsyncSession = Depends(session, scope="function")) -> dict:
     usuarios.set_consent(await _user(db, persona))
     return {"ok": True}
 
@@ -80,7 +80,7 @@ class TelefonoIn(Persona):
 
 
 @router.post("/telefono")
-async def share_phone(body: TelefonoIn, db: AsyncSession = Depends(session)) -> dict:
+async def share_phone(body: TelefonoIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     try:
         await usuarios.set_phone(db, await _user(db, body), body.telefono)
     except ValueError as exc:
@@ -112,7 +112,7 @@ async def _analyze_for(db: AsyncSession, user: Usuario, body: AnalizarIn, backgr
 
 
 @router.post("/analizar", response_model=AnalizarOut)
-async def analyze(body: AnalizarIn, background_tasks: BackgroundTasks, db: AsyncSession = Depends(session)) -> AnalizarOut:
+async def analyze(body: AnalizarIn, background_tasks: BackgroundTasks, db: AsyncSession = Depends(session, scope="function")) -> AnalizarOut:
     user = await _consented(db, body)
     tipo_registro = {"compra": "compra", "llamada": "voz"}.get(body.tipo, "mensaje")
     return await _analyze_for(db, user, body, background_tasks, tipo_registro)
@@ -120,7 +120,7 @@ async def analyze(body: AnalizarIn, background_tasks: BackgroundTasks, db: Async
 
 @router.post("/analizar-imagen", response_model=AnalizarOut)
 async def analyze_image(background_tasks: BackgroundTasks, telegram_id: int = Form(...), chat_id: int = Form(...),
-                        tipo: str = Form("mensaje"), file: UploadFile = File(...), db: AsyncSession = Depends(session)) -> AnalizarOut:
+                        tipo: str = Form("mensaje"), file: UploadFile = File(...), db: AsyncSession = Depends(session, scope="function")) -> AnalizarOut:
     persona = Persona(telegram_id=telegram_id, chat_id=chat_id)
     user = await _consented(db, persona)
     text = await text_from_image(file)
@@ -130,7 +130,7 @@ async def analyze_image(background_tasks: BackgroundTasks, telegram_id: int = Fo
 
 @router.post("/analizar-voz", response_model=AnalizarOut)
 async def analyze_voice(background_tasks: BackgroundTasks, telegram_id: int = Form(...), chat_id: int = Form(...),
-                        file: UploadFile = File(...), db: AsyncSession = Depends(session)) -> AnalizarOut:
+                        file: UploadFile = File(...), db: AsyncSession = Depends(session, scope="function")) -> AnalizarOut:
     user = await _consented(db, Persona(telegram_id=telegram_id, chat_id=chat_id))
     text = await text_from_audio(file)
     body = AnalizarIn(telegram_id=telegram_id, chat_id=chat_id, texto=text, tipo="llamada")
@@ -153,7 +153,7 @@ def _call_result(entidad: str, real: bool) -> AnalysisResult:
 
 
 @router.post("/llamada")
-async def verified_call(body: LlamadaIn, background_tasks: BackgroundTasks, db: AsyncSession = Depends(session)) -> dict:
+async def verified_call(body: LlamadaIn, background_tasks: BackgroundTasks, db: AsyncSession = Depends(session, scope="function")) -> dict:
     user = await _consented(db, body)
     entidad = await entidades.find_in_text(db, body.texto)
     if entidad is None:
@@ -183,13 +183,13 @@ class CodigoIn(Persona):
 
 
 @router.get("/entidades")
-async def connected_entities(db: AsyncSession = Depends(session)) -> dict:
+async def connected_entities(db: AsyncSession = Depends(session, scope="function")) -> dict:
     """The entities in Llamada Verificada, for the bot's buttons: the person taps one instead of typing its name."""
     return {"entidades": [e.nombre for e in await entidades.active(db) if e.tipo != "tienda"]}
 
 
 @router.post("/llamada/confirmar")
-async def confirm_code(body: CodigoIn, db: AsyncSession = Depends(session)) -> dict:
+async def confirm_code(body: CodigoIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     user = await _consented(db, body)
     if not user.telefono_hash:  # calls are found by the number the person shared: without it, no code can match
         return {"estado": "falta_telefono"}
@@ -203,7 +203,7 @@ class ValorIn(Persona):
 
 
 @router.post("/numero")
-async def check_number(body: ValorIn, background_tasks: BackgroundTasks, db: AsyncSession = Depends(session)) -> dict:
+async def check_number(body: ValorIn, background_tasks: BackgroundTasks, db: AsyncSession = Depends(session, scope="function")) -> dict:
     user = await _consented(db, body)
     tipo, valor = normalize_value(body.tipo, body.valor)
     hit = await banco.lookup(db, tipo, valor)
@@ -232,7 +232,7 @@ class ReporteIn(ValorIn):
 
 
 @router.post("/reportar")
-async def report(body: ReporteIn, db: AsyncSession = Depends(session)) -> dict:
+async def report(body: ReporteIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     user = await _consented(db, body, report_limiter)
     tipo, valor = normalize_value(body.tipo, body.valor)
     modalidad = body.modalidad if body.modalidad in MODALIDADES else None
@@ -247,7 +247,7 @@ class RevisionIn(Persona):
 
 
 @router.post("/revision")
-async def review(body: RevisionIn, db: AsyncSession = Depends(session)) -> dict:
+async def review(body: RevisionIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     user = await _consented(db, body)
     if not user.telefono_hash:
         return {"estado": "falta_telefono"}
@@ -263,7 +263,7 @@ class InvitarIn(Persona):
 
 
 @router.post("/circulo/invitar")
-async def invite(body: InvitarIn, db: AsyncSession = Depends(session)) -> dict:
+async def invite(body: InvitarIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     user = await _consented(db, body)
     try:
         token = await circulo.invite(db, user, body.familiar, body.telefono, body.relacion)
@@ -278,7 +278,7 @@ def _masked(raw: str | None) -> str | None:
 
 
 @router.get("/circulo/invitacion/{token}")
-async def invitation(token: str, db: AsyncSession = Depends(session)) -> dict:
+async def invitation(token: str, db: AsyncSession = Depends(session, scope="function")) -> dict:
     found = await circulo.pending_invite(db, token)
     if found is None:
         raise HTTPException(status_code=404, detail="La invitación no existe o ya se usó.")
@@ -294,7 +294,7 @@ class AceptarIn(Persona):
 
 
 @router.post("/circulo/aceptar")
-async def accept(body: AceptarIn, db: AsyncSession = Depends(session)) -> dict:
+async def accept(body: AceptarIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     user = await _user(db, body)
     found = await circulo.accept(db, body.token, user, body.acepta, body.telefono)
     if found is None:
@@ -312,7 +312,7 @@ class AprobarIn(Persona):
 
 
 @router.post("/circulo/aprobar")
-async def approve(body: AprobarIn, db: AsyncSession = Depends(session)) -> dict:
+async def approve(body: AprobarIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     """The protected person confirms that whoever accepted is really their relative."""
     try:
         miembro_id = UUID(body.miembro_id)
@@ -326,7 +326,7 @@ async def approve(body: AprobarIn, db: AsyncSession = Depends(session)) -> dict:
 
 
 @router.post("/circulo/ver")
-async def view_circle(persona: Persona, db: AsyncSession = Depends(session)) -> dict:
+async def view_circle(persona: Persona, db: AsyncSession = Depends(session, scope="function")) -> dict:
     user = await _user(db, persona)
     return {"miembros": [m.nombre for m, _ in await circulo.members(db, user)], "pendientes": await circulo.pending_names(db, user),
             "por_aprobar": [{"id": str(m.id), "nombre": m.nombre} for m in await circulo.to_approve(db, user)]}
@@ -338,7 +338,7 @@ class RespuestaIn(Persona):
 
 
 @router.post("/circulo/responder")
-async def answer(body: RespuestaIn, db: AsyncSession = Depends(session)) -> dict:
+async def answer(body: RespuestaIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     user = await _user(db, body)
     found = await circulo.answer(db, UUID(body.aviso_id), user, body.respuesta)
     if found is None:
@@ -355,18 +355,18 @@ class AvisoIn(BaseModel):
 
 
 @router.post("/circulo/expirar")
-async def expire(body: AvisoIn, db: AsyncSession = Depends(session)) -> dict:
+async def expire(body: AvisoIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     aviso = await circulo.expire_question(db, UUID(body.aviso_id))
     return {"expirado": aviso is not None}
 
 
 @router.post("/circulo/salir")
-async def leave(persona: Persona, db: AsyncSession = Depends(session)) -> dict:
+async def leave(persona: Persona, db: AsyncSession = Depends(session, scope="function")) -> dict:
     return {"eliminados": await circulo.leave(db, await _user(db, persona))}
 
 
 @router.post("/borrar")
-async def forget_me(persona: Persona, db: AsyncSession = Depends(session)) -> dict:
+async def forget_me(persona: Persona, db: AsyncSession = Depends(session, scope="function")) -> dict:
     """Ley 1581: the person can ask to delete their data at any time."""
     user = await usuarios.by_telegram(db, persona.telegram_id)
     if user:

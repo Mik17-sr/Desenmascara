@@ -1,4 +1,9 @@
-fastapi[standard]==0.115.0
+# FastAPI on a starlette without its published vulnerabilities (pip-audit in CI); only the extras the API uses.
+fastapi>=0.160,<1
+starlette>=1.3.1
+uvicorn[standard]>=0.30
+python-multipart>=0.0.20
+httpx>=0.27
 pydantic==2.9.2
 pydantic-settings==2.5.2
 ollama

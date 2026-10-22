@@ -1,5 +1,7 @@
 # Desenmascara · Guía Técnica del Proyecto
 
+[![Pruebas y seguridad](https://github.com/Mik17-sr/Desenmascara/actions/workflows/pruebas.yml/badge.svg)](https://github.com/Mik17-sr/Desenmascara/actions/workflows/pruebas.yml) [![App Android](https://github.com/Mik17-sr/Desenmascara/actions/workflows/android.yml/badge.svg)](https://github.com/Mik17-sr/Desenmascara/releases/latest)
+
 **Evento:** Colombia 5.0 Hackathon (22 al 23 de octubre de 2026)  
 **Versión:** 7.0 · Edición Telegram Nativo  
 **Canal Ciudadano:** Telegram Bot API ([@Desenmascara_bot](https://t.me/Desenmascara_bot))  
@@ -349,7 +351,7 @@ El modelo de 1B es más rápido, pero deja pasar 9 de las 14 estafas: nos quedam
 | Inyección de instrucciones | Mensaje aislado entre comillas, esquema JSON fijo, regla que detecta órdenes (+20 y mínimo alto riesgo) y el juez decide. |
 | Enlaces y SSRF | Los enlaces nunca se abren: solo se compara el nombre y se consulta RDAP en un host fijo, con tiempo límite. Con llave (`GOOGLE_SAFE_BROWSING_KEY`, `URLHAUS_AUTH_KEY`), el texto del enlace se busca en Safe Browsing y URLhaus, también en hosts fijos. |
 | Rate limiting | 20 consultas por minuto por IP en lo público, 12 análisis por persona en el bot y 40 reportes aparte (un reporte por número o enlace no gasta los análisis). |
-| Secretos | En `.env` (ignorado por git), generados por `setup_local.py`. Falta gitleaks en CI. |
+| Secretos | En `.env` (ignorado por git), generados por `setup_local.py`. gitleaks revisa todo el historial en cada cambio (`.github/workflows/pruebas.yml`). |
 | Acceso a datos | RLS en las 14 tablas de Supabase y permisos revocados a `anon`/`authenticated`; el Dashboard solo lee agregados anónimos; entidades con correo y contraseña (scrypt, con límite de intentos) y sesión firmada; la llave de integración se guarda como hash. |
 | Cifrado | Teléfonos, llaves e ids de Telegram como HMAC-SHA256; códigos y chats cifrados (Fernet). En Render todo va por HTTPS, y la conexión con Supabase va cifrada (TLS). |
 | Datos personales | Se borran nombres, números y cuentas antes de guardar; audios en memoria; `/borrar` elimina a la persona. |
@@ -357,7 +359,7 @@ El modelo de 1B es más rápido, pero deja pasar 9 de las 14 estafas: nos quedam
 | Círculo | El familiar se valida: comparte con Telegram el mismo número que dio el protegido y el protegido confirma que es él; el enlace dura 48 horas y sirve una vez; un número distinto no entra y el protegido recibe la alerta. Salida con un mensaje. |
 | Llamada Verificada | Solo responde a la persona llamada (su propio contacto de Telegram); código de un uso que se borra a los 15 minutos. |
 | Archivos | Tipo real por sus bytes, límites de tamaño y proceso en memoria. |
-| Dependencias | Pendiente: pip-audit, npm audit y Dependabot en CI. |
+| Dependencias | pip-audit y npm audit en cada cambio: hoy, 0 vulnerabilidades conocidas (FastAPI sobre starlette 1.x; PostCSS corregido dentro de Next). |
 
 ---
 

@@ -41,7 +41,7 @@ def _session(entidad: Entidad, remember: bool) -> dict:
 
 
 @router.post("/entidad/ingresar", dependencies=[Depends(limit_by_ip)])
-async def sign_in(body: IngresarIn, db: AsyncSession = Depends(session)) -> dict:
+async def sign_in(body: IngresarIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     """The panel's sign-in. Same answer for an unknown e-mail and a wrong password; tries are limited per IP."""
     entidad = await entidades.by_login(db, body.correo, body.clave)
     if entidad is None:
@@ -61,7 +61,7 @@ async def whoami(entidad: Entidad = Depends(require_entity)) -> dict:
 
 
 @router.post("/llamadas/registrar")
-async def register_call(body: RegistrarIn, entidad: Entidad = Depends(require_entity), db: AsyncSession = Depends(session)) -> dict:
+async def register_call(body: RegistrarIn, entidad: Entidad = Depends(require_entity), db: AsyncSession = Depends(session, scope="function")) -> dict:
     """Contract of docs/01 section 5A."""
     try:
         llamada, code = await llamadas.register(db, entidad, body.telefono_cliente, body.motivo, body.asesor)
@@ -72,7 +72,7 @@ async def register_call(body: RegistrarIn, entidad: Entidad = Depends(require_en
 
 
 @router.get("/llamadas/hoy")
-async def calls_today(entidad: Entidad = Depends(require_entity), db: AsyncSession = Depends(session)) -> list[dict]:
+async def calls_today(entidad: Entidad = Depends(require_entity), db: AsyncSession = Depends(session, scope="function")) -> list[dict]:
     return [
         {"id": str(c.id), "cliente": c.telefono_visible, "motivo": c.motivo, "asesor": c.asesor, "estado": c.estado,
          "creado": c.creado_at.isoformat() + "Z", "vence": c.vence_at.isoformat() + "Z"}
@@ -86,7 +86,7 @@ class OficialIn(BaseModel):
 
 
 @router.post("/entidad/numeros-oficiales")
-async def register_official(body: OficialIn, entidad: Entidad = Depends(require_entity), db: AsyncSession = Depends(session)) -> dict:
+async def register_official(body: OficialIn, entidad: Entidad = Depends(require_entity), db: AsyncSession = Depends(session, scope="function")) -> dict:
     tipo, valor = normalize_value("telefono", body.valor)
     numero = await banco.add_official(db, entidad, tipo, valor, body.canal, "registro", entidad.nombre)
     return {"valor": numero.valor_visible, "canal": numero.canal}

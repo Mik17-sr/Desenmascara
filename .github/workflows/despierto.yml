@@ -1,0 +1,19 @@
+# Render's free plan puts the API to sleep after 15 minutes without visits, and the next message takes about a
+# minute. This visit every 10 minutes keeps it awake (one service all month fits in the free 750 hours).
+# GitHub may run it a few minutes late; for a demo, also open /health a minute before.
+name: Mantener despierta la API
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  visita:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Visitar /health
+        run: curl --fail --silent --show-error --max-time 120 https://desenmascara-api.onrender.com/health

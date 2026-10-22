@@ -38,6 +38,9 @@ if IS_SQLITE:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA foreign_keys=ON")
+        # One writer at a time: the analysis saved after answering often meets the next request. Wait for it
+        # instead of failing with "database is locked".
+        cursor.execute("PRAGMA busy_timeout=30000")
         cursor.close()
 
 

@@ -48,7 +48,7 @@ async def run_analysis(db: AsyncSession, payload: AnalysisInput, background: Bac
 
 
 @router.post("/analyze", response_model=AnalysisResult, dependencies=[Depends(limit_by_ip)])
-async def analyze(payload: AnalysisInput, background_tasks: BackgroundTasks, db: AsyncSession = Depends(session)) -> AnalysisResult:
+async def analyze(payload: AnalysisInput, background_tasks: BackgroundTasks, db: AsyncSession = Depends(session, scope="function")) -> AnalysisResult:
     tipo = {"compra": "compra", "llamada": "voz"}.get(payload.tipo, "mensaje")
     return await run_analysis(db, payload, background_tasks, tipo_registro=tipo)
 
@@ -82,7 +82,7 @@ async def text_from_audio(file: UploadFile) -> str:
 
 @router.post("/analyze/imagen", response_model=AnalysisResult, dependencies=[Depends(limit_by_ip)])
 async def analyze_image(background_tasks: BackgroundTasks, file: UploadFile = File(...), tipo: str = Form("mensaje"),
-                        source: str = Form("dashboard"), db: AsyncSession = Depends(session)) -> AnalysisResult:
+                        source: str = Form("dashboard"), db: AsyncSession = Depends(session, scope="function")) -> AnalysisResult:
     text = await text_from_image(file)
     payload = AnalysisInput(text=text, source=source, tipo="compra" if tipo == "compra" else "mensaje")
     return await run_analysis(db, payload, background_tasks, tipo_registro="compra" if tipo == "compra" else "captura", extracted=text)
@@ -90,7 +90,7 @@ async def analyze_image(background_tasks: BackgroundTasks, file: UploadFile = Fi
 
 @router.post("/analyze/voz", response_model=AnalysisResult, dependencies=[Depends(limit_by_ip)])
 async def analyze_voice(background_tasks: BackgroundTasks, file: UploadFile = File(...), source: str = Form("dashboard"),
-                        db: AsyncSession = Depends(session)) -> AnalysisResult:
+                        db: AsyncSession = Depends(session, scope="function")) -> AnalysisResult:
     text = await text_from_audio(file)
     payload = AnalysisInput(text=text, source=source, tipo="llamada")
     return await run_analysis(db, payload, background_tasks, tipo_registro="voz", extracted=text)
@@ -121,6 +121,6 @@ def describe_hit(hit) -> dict:
 
 
 @router.get("/banco/consultar", dependencies=[Depends(limit_by_ip)])
-async def lookup_value(tipo: str, valor: str, db: AsyncSession = Depends(session)) -> dict:
+async def lookup_value(tipo: str, valor: str, db: AsyncSession = Depends(session, scope="function")) -> dict:
     tipo, valor = normalize_value(tipo, valor)
     return describe_hit(await banco.lookup(db, tipo, valor))

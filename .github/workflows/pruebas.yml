@@ -1,0 +1,48 @@
+# On every change: the 100+ tests, a scan of known vulnerabilities in the dependencies and a search for secrets that
+# should never reach GitHub. The badge at the top of the README shows the result.
+name: Pruebas y seguridad
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Pruebas (motor, API, bot, Render)
+        run: python -m pytest -q
+
+  seguridad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Secretos en el historial (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Vulnerabilidades conocidas en Python (pip-audit)
+        run: pip install pip-audit && pip-audit -r requirements.txt --progress-spinner off
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Vulnerabilidades conocidas en el Dashboard (npm audit)
+        working-directory: dashboard
+        run: npm audit --omit=dev --audit-level=high

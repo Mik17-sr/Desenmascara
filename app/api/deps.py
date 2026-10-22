@@ -10,7 +10,12 @@ from app.services import entidades
 
 
 async def session() -> AsyncGenerator[AsyncSession, None]:
-    """One transaction per request: committed if the endpoint returns, rolled back if it fails."""
+    """One transaction per request: committed if the endpoint returns, rolled back if it fails.
+
+    Use it as Depends(session, scope="function"): the commit then happens as soon as the endpoint returns, before
+    the background tasks (saving an analysis) run. With the default scope, FastAPI closes it after the response,
+    and a background save would wait for the request's own uncommitted transaction.
+    """
     async with SessionLocal() as db:
         try:
             yield db
@@ -21,7 +26,7 @@ async def session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def require_entity(x_entity_api_key: str | None = Header(default=None), authorization: str | None = Header(default=None),
-                         db: AsyncSession = Depends(session)) -> Entidad:
+                         db: AsyncSession = Depends(session, scope="function")) -> Entidad:
     """The panel signs in with e-mail and password and sends a session; integrations send the API key."""
     entidad = None
     if authorization and authorization.startswith("Bearer "):

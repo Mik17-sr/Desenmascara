@@ -29,7 +29,7 @@ class EntidadIn(BaseModel):
 
 
 @router.post("/entidades")
-async def create_entity(body: EntidadIn, db: AsyncSession = Depends(session)) -> dict:
+async def create_entity(body: EntidadIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     if await entidades.by_name(db, body.nombre):
         raise HTTPException(status_code=409, detail="Esa entidad ya existe.")
     entidad, key = await entidades.create(db, body.nombre, body.tipo, body.dominio_oficial, body.lineas_oficiales)
@@ -47,7 +47,7 @@ class ListaBlancaIn(BaseModel):
 
 
 @router.post("/banco/lista-blanca")
-async def add_official(body: ListaBlancaIn, db: AsyncSession = Depends(session)) -> dict:
+async def add_official(body: ListaBlancaIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     entidad = await entidades.by_name(db, body.entidad)
     if entidad is None:
         raise HTTPException(status_code=404, detail="No existe esa entidad.")
@@ -61,7 +61,7 @@ class ResolverIn(BaseModel):
 
 
 @router.post("/banco/revisiones/{solicitud_id}")
-async def resolve_review(solicitud_id: UUID, body: ResolverIn, db: AsyncSession = Depends(session)) -> dict:
+async def resolve_review(solicitud_id: UUID, body: ResolverIn, db: AsyncSession = Depends(session, scope="function")) -> dict:
     solicitud = await banco.resolve_review(db, solicitud_id, body.aceptar)
     if solicitud is None:
         raise HTTPException(status_code=404, detail="La solicitud no existe o ya se resolvió.")
