@@ -102,7 +102,7 @@ def test_a_bank_that_has_not_joined_is_never_called_false():
 
 def test_a_published_line_tells_where_to_call_but_not_that_a_call_is_real():
     message = format_number({"encontrado": True, "valor": "(601) 343 0000", "oficial_de": "Bancolombia", "sitio": "bancolombia.com", "nivel": 0})
-    assert message.startswith("🟢 *LÍNEA OFICIAL*") and "se puede falsificar" in message and "bancolombia\\.com" in message
+    assert message.startswith("🟢 *LÍNEA OFICIAL · PUEDES CONTESTAR*") and "se puede falsificar" in message and "bancolombia\\.com" in message
     call = format_not_connected({"estado": "no_conectada", "entidad": "Bancolombia", "linea": "01 8000 9 12345"})
     assert "01 8000 9 12345" in call
 
@@ -394,3 +394,23 @@ def test_a_code_without_a_shared_number_asks_for_it_then_checks():
     assert replies(update) == [textos.PEDIR_TELEFONO]
     asyncio.run(handlers.on_contact(update, context))
     assert "CÓDIGO CORRECTO" in replies(update)[-1]
+
+
+# --- «Me está llamando este número, ¿contesto?» -------------------------------------------------
+
+def test_the_first_line_says_whether_to_answer():
+    reported = {"encontrado": True, "valor": "+57 300 ••• 0209", "personas": 5, "reportes": 7, "modalidad": "Falso asesor del banco",
+                "estado": "normal", "oficial_de": None}
+    assert format_number(reported | {"nivel": 85}).startswith("🔴 *NO CONTESTES · \+57 300 ••• 0209*")
+    assert format_number(reported | {"nivel": 40}).startswith("🟡 *CUIDADO · \+57 300 ••• 0209*")
+    unknown = format_number({"encontrado": False, "puede_verificar": False})
+    assert unknown.startswith("🟡 *CONTESTA CON CUIDADO · SIN REPORTES*") and "opción 2" in unknown
+
+
+def test_a_call_an_entity_registered_says_answer_and_ask_for_the_code():
+    info = {"encontrado": False, "puede_verificar": True,
+            "llamada_registrada": {"entidad": "Desenmascara", "motivo": "Confirmar una compra", "asesor": "Laura M.", "codigo": "0346",
+                                   "hace_min": 2, "es_su_linea": False}}
+    message = format_number(info)
+    assert message.startswith("🟢 *CONTESTA Y PIDE EL CÓDIGO*") and "hace 2 minutos" in message and "`0 3 4 6`" in message
+    assert_valid_markdown(message)

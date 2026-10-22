@@ -39,8 +39,9 @@ PEDIR_TELEFONO = join(
     f"{esc('Toca')} {b('Compartir mi número')}{esc('. Solo lo uso para esta verificación y lo guardo protegido.')}",
 )
 PEDIR_NUMERO = join(
-    b("Revisar un número o una llamada"),
-    esc("Pega el número que te llamó o te escribió, o envíame una nota de voz contando lo que te dijeron."),
+    b("¿Contesto o no?"),
+    esc("Escríbeme el número que te está llamando (o que te escribió) y te digo si contestar."),
+    esc("Si ya hablaste, envíame una nota de voz contando lo que te dijeron."),
 )
 PEDIR_FAMILIAR = join(
     b("Agregar a tu Círculo"),

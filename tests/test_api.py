@@ -276,3 +276,16 @@ def test_a_code_needs_the_shared_number(client):
     nobody = consenting(client, 530, "Sin número")
     assert client.post("/api/v1/bot/llamada/confirmar", json=nobody | {"codigo": "1234"}, headers=BOT).json() == {"estado": "falta_telefono"}
     assert "BancoAndino" in client.get("/api/v1/bot/entidades", headers=BOT).json()["entidades"]
+
+
+def test_checking_the_number_that_calls_finds_the_call_an_entity_registered(client, entity_key):
+    rosa = consenting(client, 540, "Rosa")
+    client.post("/api/v1/bot/telefono", json=rosa | {"telefono": "315 540 0000"}, headers=BOT)
+    client.post("/api/v1/llamadas/registrar", headers={"X-Entity-API-Key": entity_key},
+                json={"telefono_cliente": "3155400000", "motivo": "Confirmar una compra", "asesor": "Ana"})
+    info = client.post("/api/v1/bot/numero", json=rosa | {"valor": "300 111 2233"}, headers=BOT).json()
+    call = info["llamada_registrada"]
+    assert call["entidad"] == "BancoAndino" and call["motivo"] == "Confirmar una compra" and len(call["codigo"]) == 4
+    # Someone else checking the same number sees no call: only the person called gets the code.
+    other = consenting(client, 541, "Otra")
+    assert "llamada_registrada" not in client.post("/api/v1/bot/numero", json=other | {"valor": "300 111 2233"}, headers=BOT).json()

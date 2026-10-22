@@ -15,7 +15,7 @@ from app.api.analysis import describe_hit, normalize_value, run_analysis, text_f
 from app.api.deps import session
 from app.core.ratelimit import RateLimiter, bot_user_limiter, report_limiter
 from app.core.security import mask_value, normalize_phone, require_bot
-from app.db.models import Usuario
+from app.db.models import Usuario, utcnow
 from app.engine.juez import MODALIDADES, risk_level
 from app.engine.oficiales import line_to_call, official_websites
 from app.engine.pistas import Pistas, extract
@@ -213,7 +213,17 @@ async def check_number(body: ValorIn, background_tasks: BackgroundTasks, db: Asy
                             modalidad=hit.modalidad if hit else None)
     background_tasks.add_task(verificaciones.save, uuid4(), usuario_id=user.id, canal="telegram", tipo="numero",
                               text=f"Consulta de {tipo}", result=result, huella=None, pistas=Pistas())
-    return info | {"tipo": tipo}
+    # "Me está llamando este número, ¿contesto?": if an entity registered a call to this person, say so and give the
+    # code to ask the advisor for. The number on screen can be faked; the code cannot.
+    waiting = await llamadas.waiting_for(db, user) if tipo == "telefono" else []
+    if waiting:
+        llamada, entidad, code = waiting[0]
+        info["llamada_registrada"] = {
+            "entidad": entidad.nombre, "motivo": llamada.motivo, "asesor": llamada.asesor, "codigo": code,
+            "hace_min": max(0, round((utcnow() - llamada.creado_at).total_seconds() / 60)),
+            "es_su_linea": bool(hit and hit.oficial_de == entidad.nombre),
+        }
+    return info | {"tipo": tipo, "puede_verificar": bool(user.telefono_hash)}
 
 
 class ReporteIn(ValorIn):

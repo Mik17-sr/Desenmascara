@@ -58,6 +58,12 @@ async def consult(session: AsyncSession, usuario: Usuario, entidad: Entidad) -> 
     return calls[0], decrypt(calls[0].codigo_cifrado)
 
 
+async def waiting_for(session: AsyncSession, usuario: Usuario) -> list[tuple[LlamadaRegistrada, Entidad, str]]:
+    """Calls an entity registered to this person and still valid, with their code. Empty without a shared number:
+    the person is known only by the number Telegram's contact button gave."""
+    return [(call, await session.get(Entidad, call.entidad_id), decrypt(call.codigo_cifrado)) for call in await _active_for(session, usuario)]
+
+
 async def confirm(session: AsyncSession, usuario: Usuario, code: str) -> tuple[LlamadaRegistrada, Entidad] | None:
     for llamada in await _active_for(session, usuario):
         if hmac.compare_digest(decrypt(llamada.codigo_cifrado), code):

@@ -126,46 +126,60 @@ def format_code(info: dict) -> str:
 
 
 def format_number(info: dict) -> str:
+    """«Me está llamando este número»: the first line says whether to answer, the next ones why and what to do."""
     valor = info.get("valor") or "Este número"
+    call = info.get("llamada_registrada")
+    if call:  # an entity registered a call to this person: answer, and ask for the code
+        hace = "ahora mismo" if call["hace_min"] < 1 else f"hace {plural(call['hace_min'], 'minuto', 'minutos')}"
+        line = f"{esc('Es su línea oficial. ')}" if call["es_su_linea"] else ""
+        return join(
+            f"🟢 {b('CONTESTA Y PIDE EL CÓDIGO')}",
+            f"{b(call['entidad'])} {esc('registró una llamada para ti ' + hace + ' · ' + call['motivo'] + '.')}",
+            f"{line}{esc('Pídele a quien te llama que te diga este código:')}",
+            code(" ".join(call["codigo"])),
+            f"{esc('Si no lo sabe,')} {b('cuelga')}{esc(': el número en pantalla se puede falsificar, el código no.')}",
+        )
     if info.get("sitio"):  # a line the entity publishes: it confirms where to call, never a call
         return join(
-            f"🟢 {b('LÍNEA OFICIAL')}",
+            f"🟢 {b('LÍNEA OFICIAL · PUEDES CONTESTAR')}",
             f"{esc('Es una línea de')} {b(info['oficial_de'])}{esc(', publicada en su página ' + info['sitio'] + '.')}",
-            f"{esc('Si te')} {b('llamaron')} {esc('desde este número, no basta: se puede falsificar en pantalla.')}",
-            f"{b('Qué hacer:')} {esc('cuelga y llama tú a este mismo número para confirmar.')}",
+            f"{b('Ojo:')} {esc('el número en pantalla se puede falsificar. Nunca des claves ni códigos por teléfono.')}",
+            f"{b('Si te piden algo:')} {esc('cuelga y llama tú a este mismo número para confirmar.')}",
         )
     if info.get("oficial_de"):
         return join(
-            f"🟢 {b('NÚMERO OFICIAL')}",
+            f"🟢 {b('NÚMERO OFICIAL · PUEDES CONTESTAR')}",
             f"{esc('Es un número que')} {b(info['oficial_de'])} {esc('registró en Desenmascara.')}",
-            f"{esc('Si te')} {b('escribe')} {esc('desde este número, es la entidad.')}",
-            f"{esc('Si te')} {b('llamó')} {esc('con este número, no basta: se puede falsificar. Usa la opción 2.')}",
+            f"{b('Ojo:')} {esc('una llamada desde este número se puede falsificar: usa la opción 2 para confirmarla.')}",
         )
     if info.get("estado") == "en_revision":
         return join(
-            f"🟡 {b('EN REVISIÓN')}",
+            f"🟡 {b('CONTESTA CON CUIDADO · EN REVISIÓN')}",
             esc("Este número tiene reportes, pero su dueño pidió revisión. Mientras tanto, no podemos decir que sea una estafa."),
             f"{b('Qué hacer:')} {esc('si dice ser tu banco, cuelga y llama tú a la línea oficial.')}",
         )
     if not info.get("encontrado") or info.get("personas", 0) == 0:
         return join(
-            f"⚪ {b('SIN REPORTES')}",
+            f"🟡 {b('CONTESTA CON CUIDADO · SIN REPORTES')}",
             esc("Nadie ha reportado este número todavía. Eso no garantiza que sea seguro."),
-            f"{b('Ojo:')} {esc('el número que ves en pantalla se puede falsificar.')}",
-            f"{b('Qué hacer:')} {esc('si dice ser tu banco, cuelga y llama tú a la línea oficial de tu tarjeta.')}",
-            esc("¿Te pidieron un código o datos? Cuéntame la llamada en una nota de voz."),
+            f"{b('Si dice ser tu banco:')} {esc('cuelga y llama tú a la línea de tu tarjeta. Nunca des claves ni códigos.')}",
+            *([] if info.get("puede_verificar", True) else [esc("¿Esperas la llamada de una empresa? Comparte tu número en la opción 2 y te digo si la registró.")]),
         )
-    level = "high" if info["nivel"] >= 70 else ("medium" if info["nivel"] >= 40 else "low")
-    dot, word = SEMAFORO[level]
     reportes = plural(info["reportes"], "reporte", "reportes")
     personas = plural(info["personas"], "persona", "personas")
     modalidad = f" como «{info['modalidad'].lower()}»" if info.get("modalidad") else ""
+    if info["nivel"] >= 70:
+        return join(
+            f"🔴 {b('NO CONTESTES · ' + valor)}",
+            f"{b(reportes)} {esc(f'de {personas}{modalidad}.')}",
+            f"{b('Si ya contestaste:')} {esc('cuelga ya. No des claves, códigos ni datos, aunque digan ser tu banco.')}",
+            esc("Si te preocupa tu cuenta, llama tú a la línea oficial de tu tarjeta."),
+        )
     return join(
-        f"{dot} {b(word + ' · ' + valor)}",
+        f"🟡 {b('CUIDADO · ' + valor)}",
         f"{b(reportes)} {esc(f'de {personas}{modalidad}.')}",
-        f"{b('Ojo:')} {esc('el número que ves en pantalla se puede falsificar.')}",
-        f"{b('Qué hacer:')} {esc('cuelga y llama tú a la línea oficial de tu tarjeta.')}",
-        esc("¿Te pidieron un código? Cuéntame la llamada en una nota de voz."),
+        f"{b('Si contestas:')} {esc('no des claves, códigos ni datos, y no pagues nada que te pidan por teléfono.')}",
+        esc("Si dice ser tu banco, cuelga y llama tú a la línea oficial de tu tarjeta."),
     )
 
 
