@@ -176,6 +176,8 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _review(update, context, text)
     elif context.user_data.get("codigo_pendiente") and CODE.search(text) and len(text) <= 60:
         await _confirm_code(update, context, CODE.search(text).group(1))
+    elif modo in ("llamada", "numero") and re.fullmatch(r"\d{4}", re.sub(r"\s", "", text)):
+        await _confirm_code(update, context, re.sub(r"\s", "", text))
     elif modo == "llamada" or CALL_QUESTION.search(text):
         await _verified_call(update, context, text)
     elif _is_phone_only(text) or modo in ("numero", "reportar"):
@@ -200,8 +202,11 @@ async def on_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     await _reply(update, esc("Gracias, ya tengo tu número protegido."), reply_markup=ReplyKeyboardRemove())
     pending = context.user_data.pop("llamada_pendiente", None)
+    code = context.user_data.pop("codigo_por_confirmar", None)
     if pending:
         await _verified_call(update, context, pending)
+    elif code:
+        await _confirm_code(update, context, code)
     elif context.user_data.get("modo") == "revision_motivo" and context.user_data.get("motivo_pendiente"):
         await _review(update, context, context.user_data.pop("motivo_pendiente"))
 
@@ -454,12 +459,13 @@ async def _verified_call(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
         await _reply(update, format_not_connected(info))
     elif info["estado"] == "entidad_desconocida":
         context.user_data["modo"] = "numero"
+        buttons = [[Btn(f"📞 {name}", callback_data=f"ent:{name}"[:64])] for name in info["entidades"][:8]]
         await _reply(update, join(
             esc("No encontré esa entidad en Llamada Verificada."),
-            esc("Entidades conectadas: " + (", ".join(info["entidades"]) or "ninguna todavía") + "."),
+            esc("Toca la entidad que dice llamarte:") if buttons else esc("Todavía no hay entidades conectadas."),
             esc("Si no está, envíame el número que te llamó y lo reviso en el Banco de números."),
             f"{b('Regla de oro:')} {esc('cuelga y llama tú a la línea oficial que está en tu tarjeta.')}",
-        ))
+        ), reply_markup=InlineKeyboardMarkup(buttons) if buttons else None)
     elif info["estado"] == "falta_telefono":
         context.user_data["llamada_pendiente"] = text
         await _reply(update, textos.PEDIR_TELEFONO, reply_markup=ReplyKeyboardMarkup(
@@ -475,12 +481,28 @@ async def _verified_call(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
 
 async def _confirm_code(update: Update, context: ContextTypes.DEFAULT_TYPE, code: str) -> None:
     context.user_data["codigo_pendiente"] = False
+    context.user_data["modo"] = None
     try:
         info = await _api(context).post("/bot/llamada/confirmar", json=_who(update) | {"codigo": code})
     except ApiError as error:
         await _api_error(update, context, error)
         return
+    if info["estado"] == "falta_telefono":
+        context.user_data["codigo_por_confirmar"] = code
+        await _reply(update, textos.PEDIR_TELEFONO, reply_markup=ReplyKeyboardMarkup(
+            [[KeyboardButton("Compartir mi número", request_contact=True)]], one_time_keyboard=True, resize_keyboard=True))
+        return
     await _reply(update, format_code(info))
+
+
+async def _entity_buttons(context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup | None:
+    """One button per entity in Llamada Verificada: tapping beats typing the name right."""
+    try:
+        names = (await _api(context).get("/bot/entidades"))["entidades"]
+    except ApiError:
+        return None
+    buttons = [[Btn(f"📞 {name}", callback_data=f"ent:{name}"[:64])] for name in names[:8]]
+    return InlineKeyboardMarkup(buttons) if buttons else None
 
 
 async def _check_number(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
@@ -575,7 +597,7 @@ async def _choose(update: Update, context: ContextTypes.DEFAULT_TYPE, option: st
     if option == "1":
         await _reply(update, textos.PEDIR_MENSAJE)
     elif option == "2":
-        await _reply(update, textos.PEDIR_ENTIDAD)
+        await _reply(update, textos.PEDIR_ENTIDAD, reply_markup=await _entity_buttons(context))
     elif option == "3":
         await _reply(update, textos.PEDIR_NUMERO)
     elif option == "4":
@@ -609,6 +631,9 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _answer_invitation(update, context, data)
     elif data.startswith("apr:"):
         await _approve(update, context, data)
+    elif data.startswith("ent:"):
+        if await _ensure_consent(update, context):
+            await _verified_call(update, context, data[4:])
     elif data.startswith("resp:"):
         await _answer_question(update, context, data)
     elif not await _ensure_consent(update, context):

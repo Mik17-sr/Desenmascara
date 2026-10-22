@@ -182,9 +182,17 @@ class CodigoIn(Persona):
     codigo: str = Field(..., pattern=r"^\d{4}$")
 
 
+@router.get("/entidades")
+async def connected_entities(db: AsyncSession = Depends(session)) -> dict:
+    """The entities in Llamada Verificada, for the bot's buttons: the person taps one instead of typing its name."""
+    return {"entidades": [e.nombre for e in await entidades.active(db) if e.tipo != "tienda"]}
+
+
 @router.post("/llamada/confirmar")
 async def confirm_code(body: CodigoIn, db: AsyncSession = Depends(session)) -> dict:
     user = await _consented(db, body)
+    if not user.telefono_hash:  # calls are found by the number the person shared: without it, no code can match
+        return {"estado": "falta_telefono"}
     found = await llamadas.confirm(db, user, body.codigo)
     return {"estado": "correcto", "entidad": found[1].nombre} if found else {"estado": "incorrecto"}
 

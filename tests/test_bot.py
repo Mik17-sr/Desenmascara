@@ -355,3 +355,42 @@ def test_accepting_asks_for_the_number_first():
     assert api.calls == [] and context.user_data["invitacion_token"] == "tok"
     keyboard = update.effective_message.reply_text.call_args.kwargs["reply_markup"].keyboard[0][0]
     assert keyboard.text == "Compartir mi número" and keyboard.request_contact
+
+
+# --- ¿Me están llamando de verdad?: buttons and a pasted code ------------------------------------
+
+def test_option_2_offers_the_connected_entities_as_buttons():
+    api = FakeApi({"/bot/entidades": {"entidades": ["Desenmascara"]}})
+    update, context = fake(None, api)
+    update.callback_query = SimpleNamespace(data="m2", answer=AsyncMock(), edit_message_reply_markup=AsyncMock())
+    asyncio.run(handlers.on_button(update, context))
+    button = update.effective_message.reply_text.call_args.kwargs["reply_markup"].inline_keyboard[0][0]
+    assert button.text == "📞 Desenmascara" and button.callback_data == "ent:Desenmascara"
+
+
+def test_tapping_an_entity_asks_about_it():
+    api = FakeApi({"/bot/llamada": {"estado": "real", "entidad": "Desenmascara", "motivo": "Confirmar una compra", "codigo": "0346"}})
+    update, context = fake(None, api)
+    update.callback_query = SimpleNamespace(data="ent:Desenmascara", answer=AsyncMock(), edit_message_reply_markup=AsyncMock())
+    asyncio.run(handlers.on_button(update, context))
+    assert api.calls[-1][1]["texto"] == "Desenmascara" and "SÍ, ES REAL" in replies(update)[0]
+
+
+def test_a_code_pasted_from_the_panel_is_read_as_a_code():
+    api = FakeApi({"/bot/llamada/confirmar": {"estado": "correcto", "entidad": "Desenmascara"}})
+    update, context = fake("0\n3\n4\n6", api)
+    context.user_data["modo"] = "llamada"
+    asyncio.run(handlers.on_text(update, context))
+    assert api.calls == [("/bot/llamada/confirmar", {"telegram_id": 1, "chat_id": 10, "nombre": "Rosa", "codigo": "0346"})]
+    assert "CÓDIGO CORRECTO" in replies(update)[0]
+
+
+def test_a_code_without_a_shared_number_asks_for_it_then_checks():
+    answers = iter([{"estado": "falta_telefono"}, {"estado": "correcto", "entidad": "Desenmascara"}])
+    api = FakeApi({"/bot/llamada/confirmar": lambda _: next(answers), "/bot/telefono": {"ok": True}})
+    update, context = fake("0346", api, contact=SimpleNamespace(user_id=1, phone_number="+57 313 389 8638"))
+    context.user_data["modo"] = "llamada"
+    asyncio.run(handlers.on_text(update, context))
+    assert replies(update) == [textos.PEDIR_TELEFONO]
+    asyncio.run(handlers.on_contact(update, context))
+    assert "CÓDIGO CORRECTO" in replies(update)[-1]

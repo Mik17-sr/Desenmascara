@@ -32,7 +32,7 @@ CONSENTIMIENTO = join(
 PEDIR_MENSAJE = esc("Reenvíame el mensaje, pégalo aquí o envíame una captura de pantalla.")
 PEDIR_ENTIDAD = join(
     b("¿Me están llamando de verdad?"),
-    esc("Escríbeme quién dice llamarte, por ejemplo: «¿BancoAndino me está llamando?». No cuelgues todavía."),
+    esc("Toca la entidad que dice llamarte, o escribe su nombre. No cuelgues todavía."),
 )
 PEDIR_TELEFONO = join(
     esc("Para preguntarle a la entidad necesito saber a qué número te están llamando."),

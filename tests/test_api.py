@@ -270,3 +270,9 @@ def test_a_measurement_is_answered_but_never_saved(client):
     answer = client.post("/api/v1/analyze", json=body).json()
     assert answer["risk_level"] == "high" and answer["verification_id"] is None
     assert radar() == before
+
+
+def test_a_code_needs_the_shared_number(client):
+    nobody = consenting(client, 530, "Sin número")
+    assert client.post("/api/v1/bot/llamada/confirmar", json=nobody | {"codigo": "1234"}, headers=BOT).json() == {"estado": "falta_telefono"}
+    assert "BancoAndino" in client.get("/api/v1/bot/entidades", headers=BOT).json()["entidades"]
