@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Building, CheckCircle, Copy, Key, Logout, Phone, ShieldCheck } from "@/components/icons";
+import { AlertTriangle, Building, CheckCircle, Copy, Key, Logout, Phone, ShieldCheck } from "@/components/icons";
 import { Button, Card, Empty, Notice, PageHeader } from "@/components/ui";
-import { ApiError, api, postJSON, type Llamada } from "@/lib/api";
+import { ApiError, api, postJSON, type AlertaMarca, type Llamada } from "@/lib/api";
 import { ago } from "@/lib/format";
 import { useDemo } from "@/lib/useDemo";
 import { useLive } from "@/lib/useLive";
@@ -233,6 +233,8 @@ function Panel({ entity, token, onLogout }: { entity: string; token: string; onL
         </Card>
       </div>
 
+      <AlertaTemprana token={token} />
+
       <div className="mt-6">
         <Card title="Llamadas de hoy" icon={Phone} padded={false}
               action={<span className="text-xs text-muted">{counts.ok} de {counts.total} verificadas por el cliente</span>}>
@@ -270,5 +272,41 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
       <input value={value} onChange={(e) => onChange(e.target.value)}
              className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 outline-none focus:border-brand focus:ring-4 focus:ring-brand/15" />
     </label>
+  );
+}
+
+
+/** Early warning: what the community reported this month using the entity's name, to warn its customers first. */
+function AlertaTemprana({ token }: { token: string }) {
+  const load = useCallback(() => api<AlertaMarca>("/entidad/alertas", { headers: bearer(token) }), [token]);
+  const { data } = useLive(load, 30000);
+  if (!data) return null;
+  const active = data.mensajes > 0;
+  return (
+    <div className="mt-6">
+      <Card title={`Alerta temprana · suplantaciones de ${data.marca}`} icon={AlertTriangle}
+            action={<span className="text-xs text-muted">últimos {data.dias} días</span>}>
+        {active ? (
+          <div className="space-y-3">
+            <p className="text-sm">
+              <span className="text-2xl font-bold text-risk-high tabular">{data.mensajes}</span>{" "}
+              {data.mensajes === 1 ? "mensaje de estafa usó" : "mensajes de estafa usaron"} el nombre de <b>{data.marca}</b>
+              {data.hoy > 0 && <span className="ml-2 rounded-full bg-risk-high-bg px-2 py-0.5 text-xs font-semibold text-risk-high">+{data.hoy} hoy</span>}
+              <span className="text-muted"> · último {ago(data.ultimo)}</span>
+            </p>
+            {data.modalidades.length > 0 && <p className="text-sm"><b>Modalidad:</b> {data.modalidades.join(" · ")}</p>}
+            {data.dominios.length > 0 && (
+              <p className="text-sm"><b>Enlaces falsos:</b>{" "}
+                {data.dominios.map((d) => <code key={d} className="mr-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-xs">{d}</code>)}
+              </p>
+            )}
+            {data.ejemplo && <blockquote className="rounded-xl border border-line bg-surface-2 p-3 text-xs text-muted">«{data.ejemplo}…»</blockquote>}
+            <p className="text-xs text-muted">Avísales a tus clientes por tus canales oficiales y pide bajar los enlaces. Los textos llegan sin nombres, números ni cuentas.</p>
+          </div>
+        ) : (
+          <Empty icon={ShieldCheck}>Ninguna estafa usó el nombre de {data.marca} en los últimos {data.dias} días. Si aparece una, la verás aquí.</Empty>
+        )}
+      </Card>
+    </div>
   );
 }

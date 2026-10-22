@@ -78,6 +78,15 @@ export type Radar = {
   llamadas_ultimas: { entidad: string; real: boolean; cuando: string }[];
 };
 
+export type Impacto = {
+  estafas_detectadas: number; alto_riesgo: number; revisiones: number; personas: number; dinero_pedido: number;
+  alertas_circulo: number; llamadas_verificadas: number; reportes: number; campanas: number; desde: string | null;
+};
+export type Marca = { marca: string; mensajes: number; hoy: number; ultimo: string | null; modalidad: string | null };
+export type AlertaMarca = {
+  marca: string; dias: number; mensajes: number; hoy: number; ultimo: string | null; modalidades: string[]; dominios: string[];
+  ejemplo: string | null;
+};
 export type Health = { status: string; version: string; base_de_datos: string; ia: string; demo?: boolean };
 
 export function health(): Promise<Health> {

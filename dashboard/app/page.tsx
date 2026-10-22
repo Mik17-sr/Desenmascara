@@ -7,6 +7,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import {
   Activity, AlertTriangle, Close, ImageIcon, Megaphone, Message, Mic, Phone, ShieldCheck,
 } from "@/components/icons";
+import { ImpactoYMarcas } from "@/components/impacto";
 import { Card, Empty, GrowBar, Kpi, LevelPill, LiveDot, Notice, PageHeader, Skeleton } from "@/components/ui";
 import { api, type Radar } from "@/lib/api";
 import { ago, LEVELS, n, plural } from "@/lib/format";
@@ -143,6 +144,8 @@ export default function RadarPage() {
             ) : <Empty icon={Megaphone}>Ninguna campaña activa en las últimas 24 horas.</Empty>}
           </Card>
         </div>
+
+        <ImpactoYMarcas />
 
         <div className="grid items-start gap-4 lg:grid-cols-3">
           <Card title="Llamada Verificada · últimas consultas" icon={Phone} padded={false}>

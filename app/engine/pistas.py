@@ -34,6 +34,9 @@ KNOWN_NAMES = [
     "Banco Caja Social", "Scotiabank Colpatria", "Davibank", "Banco Agrario", "AV Villas", "Itaú", "Nequi",
     "Daviplata", "Banco Falabella", "Lulo Bank", "DIAN", "Policía", "Fiscalía", "Registraduría",
     "Secretaría de Movilidad", "SIMIT", "Servientrega", "Interrapidisimo", "Coordinadora", "Mercado Libre",
+    # Collections, credit bureaus and operators that the team's real cases impersonate (datasets/casos_reales.csv).
+    # Never a common word such as "Claro": a brand is only said when the message really names it.
+    "Credivalores", "SystemGroup", "Datacrédito", "TransUnion", "Sistecrédito", "Movistar", "Tigo", "Falabella", "Rappi",
 ]
 # "Tu código es 482913. No lo compartas": a notice that hands over a code, which small models
 # read as a request for it. Only counts when the message asks for nothing back.
@@ -179,6 +182,13 @@ def extract_urls(text: str) -> list[str]:
         if parsed.scheme in {"http", "https"} and parsed.hostname and "." in parsed.hostname:
             urls.append(urlunsplit(parsed._replace(scheme=parsed.scheme.lower(), netloc=parsed.netloc.lower())))
     return list(dict.fromkeys(urls))
+
+
+def brands_named(text: str, extra: list[str] | None = None) -> list[str]:
+    """The entities a message names (also in OCR text without spaces): for the Dashboard's early warning."""
+    found = _find_names(text, (extra or []) + KNOWN_NAMES)
+    # "Banco Falabella" also contains "Falabella": keep the longer name only.
+    return [n for n in found if not any(n != other and plain(n) in plain(other) for other in found)]
 
 
 def _find_names(text: str, names: list[str]) -> list[str]:

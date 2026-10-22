@@ -25,7 +25,9 @@ SIMILAR = 0.6
 LOOKBACK = timedelta(days=7)
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 NAME_AFTER = re.compile(r"(?i)\b(soy|me llamo|habla|le habla|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)")
-LONG_NUMBER = re.compile(r"\b\d[\d .-]{5,}\d\b")
+# Long digit runs (IDs, accounts) go; an amount after "$" stays: it is not personal, and the Dashboard adds up
+# what scams ask for.
+LONG_NUMBER = re.compile(r"(?<!\$)(?<!\$ )\b\d[\d .-]{5,}\d\b")
 
 
 def anonymize(text: str) -> str:

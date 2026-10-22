@@ -1,14 +1,18 @@
 """Aggregated, anonymous numbers for the Dashboard. It never reads a row with personal data."""
 
+import re
+from collections import Counter
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Campana, Entidad, Indicador, LlamadaRegistrada, NumeroOficial, Reporte, SolicitudRevision, Verificacion, utcnow
+from app.db.models import (AvisoCirculo, Campana, Entidad, Indicador, LlamadaRegistrada, NumeroOficial, Reporte, SolicitudRevision,
+                           Verificacion, utcnow)
 from app.engine import oficiales as published
 from app.engine.juez import MODALIDADES, risk_level
-from app.services import llamadas
+from app.engine.pistas import AMOUNT_PATTERN, brands_named
+from app.services import entidades, llamadas
 from app.services.usuarios import value_fingerprint
 
 COLOMBIA = timedelta(hours=-5)
@@ -23,6 +27,67 @@ def _day_start() -> datetime:
     """Midnight in Colombia, expressed in UTC."""
     local = utcnow() + COLOMBIA
     return local.replace(hour=0, minute=0, second=0, microsecond=0) - COLOMBIA
+
+
+def _pesos(raw: str) -> int:
+    """'$158.100' -> 158100; '$1.250.000,50' -> 1250000. Above a billion it is OCR noise, not an amount."""
+    value = re.sub(r"[.,]\d{2}$", "", raw) if re.search(r"[.,]\d{3}[.,]\d{2}$", raw) else raw
+    pesos = int(re.sub(r"\D", "", value) or 0)
+    return pesos if pesos < 1_000_000_000 else 0
+
+
+def _asked(texto: str | None) -> int:
+    """The largest amount one message asks for; its other amounts are usually the "before" of a fake discount."""
+    return max((_pesos(m) for m in AMOUNT_PATTERN.findall(texto or "")), default=0)
+
+
+async def impact(session: AsyncSession) -> dict:
+    """What Desenmascara did since it started, from the real checks: nothing estimated, nothing invented."""
+    rows = (await session.execute(select(Verificacion.nivel, Verificacion.usuario_id, Verificacion.texto_anonimizado,
+                                         Verificacion.creado_at))).all()
+    count = lambda model, *where: session.scalar(select(func.count()).select_from(model).where(*where))  # noqa: E731
+    return {
+        "estafas_detectadas": sum(r.nivel in ("high", "medium") for r in rows),
+        "alto_riesgo": sum(r.nivel == "high" for r in rows),
+        "revisiones": len(rows),
+        "personas": len({r.usuario_id for r in rows if r.usuario_id}),
+        "dinero_pedido": sum(_asked(r.texto_anonimizado) for r in rows if r.nivel == "high"),
+        "alertas_circulo": await count(AvisoCirculo),
+        "llamadas_verificadas": await count(LlamadaRegistrada, LlamadaRegistrada.estado == "confirmada"),
+        "reportes": await count(Reporte),
+        "campanas": await count(Campana),
+        "desde": _iso(min((r.creado_at for r in rows), default=None)),
+    }
+
+
+async def brands(session: AsyncSession, days: int = 30, only: str | None = None) -> list[dict]:
+    """Early warning: the entities that scams impersonate, read from the anonymized text of risky checks."""
+    since, today = utcnow() - timedelta(days=days), _day_start()
+    rows = (await session.execute(
+        select(Verificacion.texto_anonimizado, Verificacion.creado_at, Verificacion.modalidad, Verificacion.senales)
+        .where(Verificacion.creado_at >= since, Verificacion.nivel.in_(("high", "medium")))
+        .order_by(Verificacion.creado_at.desc()).limit(5000)
+    )).all()
+    names = [e.nombre for e in await entidades.active(session)]
+    found: dict[str, dict] = {}
+    for row in rows:
+        for marca in brands_named(row.texto_anonimizado or "", names):
+            if only and marca != only:
+                continue
+            b = found.setdefault(marca, {"marca": marca, "mensajes": 0, "hoy": 0, "ultimo": row.creado_at,
+                                         "modalidades": Counter(), "dominios": Counter(), "ejemplo": (row.texto_anonimizado or "")[:180]})
+            b["mensajes"] += 1
+            b["hoy"] += row.creado_at >= today
+            if row.modalidad:
+                b["modalidades"][MODALIDADES.get(row.modalidad, (row.modalidad,))[0]] += 1
+            for signal in row.senales or []:
+                if signal.get("code") in ("DOMINIO_NO_REGISTRADO", "DOMINIO_NUEVO", "ENLACE_IMITA_OFICIAL", "ENLACE_ACORTADO") \
+                        and signal.get("evidence"):
+                    b["dominios"][signal["evidence"]] += 1
+    out = sorted(found.values(), key=lambda b: (-b["mensajes"], b["marca"]))
+    return [b | {"ultimo": _iso(b["ultimo"]), "modalidad": (b["modalidades"].most_common(1) or [(None,)])[0][0],
+                 "modalidades": [m for m, _ in b["modalidades"].most_common(3)], "dominios": [d for d, _ in b["dominios"].most_common(5)]}
+            for b in out]
 
 
 async def radar(session: AsyncSession) -> dict:

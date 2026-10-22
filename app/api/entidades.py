@@ -10,7 +10,7 @@ from app.api.deps import require_entity, session
 from app.core.ratelimit import limit_by_ip
 from app.core.security import new_session
 from app.db.models import Entidad
-from app.services import banco, entidades, llamadas
+from app.services import banco, dashboard, entidades, llamadas
 
 router = APIRouter()
 
@@ -53,6 +53,14 @@ async def sign_in(body: IngresarIn, db: AsyncSession = Depends(session, scope="f
 async def session_from_key(body: SesionIn, entidad: Entidad = Depends(require_entity)) -> dict:
     """Swaps the API key (sign-in links, integrations) for a panel session, so the panel never keeps the key."""
     return _session(entidad, body.recordar)
+
+
+@router.get("/entidad/alertas")
+async def brand_alerts(entidad: Entidad = Depends(require_entity), db: AsyncSession = Depends(session, scope="function")) -> dict:
+    """Early warning: the scams that used this entity's name in the last 30 days, as the community reported them."""
+    found = (await dashboard.brands(db, only=entidad.nombre) or [None])[0]
+    empty = {"mensajes": 0, "hoy": 0, "ultimo": None, "modalidades": [], "dominios": [], "ejemplo": None}
+    return {"marca": entidad.nombre, "dias": 30} | ({k: found[k] for k in empty} if found else empty)
 
 
 @router.get("/entidad/yo")

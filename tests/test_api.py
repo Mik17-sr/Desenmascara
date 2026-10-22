@@ -289,3 +289,27 @@ def test_checking_the_number_that_calls_finds_the_call_an_entity_registered(clie
     # Someone else checking the same number sees no call: only the person called gets the code.
     other = consenting(client, 541, "Otra")
     assert "llamada_registrada" not in client.post("/api/v1/bot/numero", json=other | {"valor": "300 111 2233"}, headers=BOT).json()
+
+
+def test_impact_and_early_warning_come_from_real_checks(client, entity_key):
+    from app.services.dashboard import _asked, _pesos
+
+    assert _pesos("$158.100") == 158100 and _pesos("$1.250.000,50") == 1250000 and _asked("Debe $943.890, pague $533.248") == 943890
+    with fake_ai("suplantacion_bancaria", "datos_personales", True):
+        client.post("/api/v1/analyze", json={"text": PHISHING + " Pague $150.000 hoy.", "source": "dashboard"})
+    impact = client.get("/api/v1/dashboard/impacto").json()
+    assert impact["estafas_detectadas"] >= 1 and impact["dinero_pedido"] >= 150000 and impact["revisiones"] >= impact["estafas_detectadas"]
+    brands = client.get("/api/v1/dashboard/marcas").json()
+    andino = next(b for b in brands if b["marca"] == "BancoAndino")
+    assert andino["mensajes"] >= 1 and set(andino) == {"marca", "mensajes", "hoy", "ultimo", "modalidad"}  # never a text in public
+    alert = client.get("/api/v1/entidad/alertas", headers={"X-Entity-API-Key": entity_key}).json()
+    assert alert["marca"] == "BancoAndino" and alert["mensajes"] >= 1 and "bancoandino-seguro.co" in alert["dominios"]
+    assert "[número]" in alert["ejemplo"] or "BancoAndino" in alert["ejemplo"]
+
+
+def test_a_brand_inside_a_longer_name_is_said_once():
+    from app.engine.pistas import brands_named
+
+    assert brands_named("Banco Falabella: su tarjeta fue bloqueada") == ["Banco Falabella"]
+    assert brands_named("SystemgroupyCredivalores tambienseadhierenalaferia MiDataCredito") == ["Credivalores", "SystemGroup", "Datacrédito"]
+    assert brands_named("Claro que sí, nos vemos mañana") == []

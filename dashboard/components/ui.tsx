@@ -65,8 +65,8 @@ function Sparkline({ values }: { values: number[] }) {
 }
 
 /** A compact figure tile, as in the guide's mock-up. tone="brand" fills the tile with the brand's tint. */
-export function Kpi({ label, value, suffix = "", decimals = 0, note, delta, tone, spark, loading }: {
-  label: string; value: number; suffix?: string; decimals?: number; note?: string;
+export function Kpi({ label, value, prefix = "", suffix = "", decimals = 0, note, delta, tone, spark, loading }: {
+  label: string; value: number; prefix?: string; suffix?: string; decimals?: number; note?: string;
   delta?: number | null; tone?: "high" | "brand"; spark?: number[]; loading?: boolean;
 }) {
   const shown = useCountUp(value);
@@ -77,7 +77,7 @@ export function Kpi({ label, value, suffix = "", decimals = 0, note, delta, tone
       <span className="text-xs font-medium text-muted">{label}</span>
       {loading ? <div className="skeleton mt-2 h-8 w-20" /> : (
         <div className={`tabular mt-1 text-2xl font-bold tracking-tight sm:text-[28px] ${color}`}>
-          {shown.toLocaleString("es-CO", { maximumFractionDigits: decimals, minimumFractionDigits: decimals })}{suffix}
+          {prefix}{shown.toLocaleString("es-CO", { maximumFractionDigits: decimals, minimumFractionDigits: decimals })}{suffix}
         </div>
       )}
       <div className="mt-1 flex items-center gap-2 text-xs text-muted">
