@@ -76,7 +76,9 @@ RESPONSE_SCHEMA = {
 # A small model does not resist this reliably, so the usual phrasings are caught before calling it.
 INJECTION_PATTERN = re.compile(
     r"\b(ignora|olvida|omite|ignore|forget)\w*\s+(\w+\s+){0,3}(instrucciones|reglas|indicaciones|instructions|rules)\b"
-    r"|\bresponde\s+que\s+(este|el)\s+mensaje\b",
+    r"|\bresponde\s+que\s+(este|el)\s+mensaje\b"
+    r"|\bnota\s+para\s+el\s+sistema\b|\b(este|el)\s+mensaje\s+ya\s+fue\s+verificado\b"
+    r"|\bclasifica\w*\s+(este|el)\s+(texto|mensaje)\s+como\b",
     re.IGNORECASE,
 )
 

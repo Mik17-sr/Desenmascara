@@ -5,8 +5,8 @@ import httpx
 from app.core.config import settings
 
 TEXT_TIMEOUT = 8.0  # the guide's budget: an answer in less than 8 seconds
-IMAGE_TIMEOUT = 20.0
-VOICE_TIMEOUT = 30.0
+IMAGE_TIMEOUT = settings.BOT_TIMEOUT_IMAGEN
+VOICE_TIMEOUT = settings.BOT_TIMEOUT_VOZ
 
 
 class ApiError(Exception):

@@ -360,4 +360,39 @@ El modelo de 1B es más rápido, pero deja pasar 9 de las 14 estafas: nos quedam
 
 Funciona: el bot con mensajes, capturas, números y notas de voz; Llamada Verificada con BancoAndino (ficticio); Círculo de Confianza con invitaciones; Banco de números con lista blanca y revisiones; Antes de pagar; el Dashboard con sus 4 vistas.
 
-Falta o es visión: WhatsApp (Twilio); los 4 casos reales del equipo y el dataset real; despliegue (Render/Railway y Vercel) con TLS; escaneos de seguridad en CI; entidades reales conectadas.
+Falta o es visión: WhatsApp (Twilio); los 4 casos reales del equipo y el dataset real; escaneos de seguridad en CI; entidades reales conectadas. El despliegue en Render ya está listo en `render.yaml` (sección 18).
+
+---
+
+## 18. Publicar en Render (plan gratis)
+
+`render.yaml` crea dos servicios gratis: **desenmascara-api** (la API, con el bot adentro) y **desenmascara-dashboard**. En el servidor el bot no pregunta a Telegram: Telegram le envía cada mensaje a `POST /telegram/webhook` (con una llave secreta) y la API lo atiende. En tu computador todo sigue igual.
+
+**Antes de Render**
+
+1. Pasa los datos a Supabase (sección 14): el disco de Render se borra en cada despliegue y reinicio, y SQLite los perdería. Crea el proyecto en la región **us-east-1**, cerca de Render (Virginia), y guarda la cadena del **Session pooler**.
+2. Copia tus datos: pon esa cadena como `DATABASE_URL` en tu `.env` y ejecuta `python scripts/migrar_a_supabase.py`.
+
+**En Render**
+
+3. En [render.com](https://render.com): **New → Blueprint**, conecta el repositorio `Mik17-sr/Desenmascara` (rama `main`). Render lee `render.yaml`.
+4. Llena los valores que pide. Pégalos tú en Render; no los mandes por chat:
+
+| Variable | De dónde sale |
+|---|---|
+| `DATABASE_URL` | Supabase, Session pooler |
+| `TELEGRAM_BOT_TOKEN` | tu `.env` (el token de @BotFather) |
+| `HMAC_SECRET`, `ENCRYPTION_KEY`, `BOT_API_SECRET`, `ADMIN_API_KEY` | tu `.env`, **los mismos valores**: las huellas y los datos cifrados solo se abren con ellos |
+| `DASHBOARD_ORIGINS` | `https://desenmascara-dashboard.onrender.com` |
+| `NEXT_PUBLIC_API_URL` | `https://desenmascara-api.onrender.com/api/v1` |
+
+   Si Render les da otras direcciones (porque el nombre ya estaba usado), corrige las dos últimas en **Environment** y vuelve a desplegar el Dashboard (**Manual Deploy**): `NEXT_PUBLIC_API_URL` se lee al construirlo. Para el tiempo real, agrega también `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` al Dashboard.
+5. Apaga el bot de tu computador. Al arrancar, la API registra el webhook y desde ahí Telegram le envía los mensajes a Render. Mientras el bot esté publicado, `python -m app.bot.client` no arranca, para no quitárselo al servidor; con `--forzar` lo traes de vuelta a tu computador.
+6. Comprueba `https://desenmascara-api.onrender.com/health`: debe decir `"base_de_datos": "ok"` e `"ia": "apagada"`. Luego escríbele «Hola» a @Desenmascara_bot.
+
+**Qué esperar del plan gratis**
+
+- Se duerme a los 15 minutos sin uso: el primer mensaje después tarda alrededor de un minuto (Telegram lo reintenta y llega). Antes de una presentación, abre `/health` un minuto antes.
+- No hay IA local (Ollama no cabe): responden las reglas. Medido así (`IA_LOCAL=false`): 20 de 20 estafas reales y 14 de 14 de prueba, sin falsos positivos.
+- Capturas: el OCR llegó a 416 MB en la prueba. Cabe en los 512 MB, pero con poca CPU tarda más; el bot espera hasta 120 s. Notas de voz: Whisper `tiny`; si una llega mientras se lee una captura, la memoria puede pasar de 512 MB y Render reinicia el servicio (los datos no se pierden: están en Supabase).
+- Con el plan Standard (2 GB) todo esto funciona holgado.

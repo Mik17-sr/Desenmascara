@@ -1,0 +1,69 @@
+# Render Blueprint: the API with the Telegram bot inside (webhook) and the Dashboard, both on the free plan.
+# Step by step in the README, section "Publicar en Render". The data lives in Supabase: Render's disk is
+# erased on every deploy and restart, so SQLite would lose it.
+#
+# Values with "sync: false" are asked for when the Blueprint is created. Never write them here: this file is public.
+services:
+  - type: web
+    name: desenmascara-api
+    runtime: python
+    plan: free
+    region: virginia  # the closest to Colombia; create Supabase in us-east-1 (N. Virginia) too
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: PORT
+        value: 10000
+      # The bot inside the service calls the API at its own address.
+      - key: API_BASE_URL
+        value: http://127.0.0.1:10000
+      # There is no Ollama on Render: the rules answer alone (20/20 real scams in datasets/casos_reales.csv).
+      - key: IA_LOCAL
+        value: "false"
+      # 512 MB and it must wake fast: OCR and Whisper load with the first screenshot or voice note.
+      - key: PRECARGAR_MODELOS
+        value: "false"
+      - key: WHISPER_MODEL
+        value: tiny
+      - key: BOT_TIMEOUT_IMAGEN
+        value: "120"
+      - key: BOT_TIMEOUT_VOZ
+        value: "150"
+      # Supabase, "Session pooler" connection string (README, section 14).
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      # The same four values as your .env: fingerprints and encrypted data only open with the secrets they were made with.
+      - key: HMAC_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: BOT_API_SECRET
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      # The Dashboard's address, e.g. https://desenmascara-dashboard.onrender.com (CORS).
+      - key: DASHBOARD_ORIGINS
+        sync: false
+
+  - type: web
+    name: desenmascara-dashboard
+    runtime: node
+    plan: free
+    region: virginia
+    branch: main
+    rootDir: dashboard
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # The API's address + /api/v1, e.g. https://desenmascara-api.onrender.com/api/v1. It is read when building:
+      # after changing it, deploy the Dashboard again.
+      - key: NEXT_PUBLIC_API_URL
+        sync: false

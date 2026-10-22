@@ -1,9 +1,12 @@
 """Telegram entry point. All risk evaluation is delegated to the FastAPI API.
 
-    python -m app.bot.client
+    python -m app.bot.client            # on your computer, by polling
+    (on a server it runs inside the API by webhook: app/bot/webhook.py)
 """
 
+import asyncio
 import logging
+import sys
 from pathlib import Path
 
 from telegram import Bot, BotCommand, InputProfilePhotoStatic, Update
@@ -58,7 +61,7 @@ async def _profile(bot: Bot) -> None:
         await bot.set_my_profile_photo(InputProfilePhotoStatic(AVATAR.read_bytes()))
 
 
-async def _post_init(application: Application) -> None:
+async def post_init(application: Application) -> None:
     application.bot_data["api"] = Api()
     await application.bot.set_my_commands(COMMANDS)
     try:
@@ -67,14 +70,16 @@ async def _post_init(application: Application) -> None:
         logger.warning("Could not update the bot profile: %r", exc)
 
 
-async def _post_shutdown(application: Application) -> None:
+async def post_shutdown(application: Application) -> None:
     await application.bot_data["api"].close()
 
 
-def create_application(token: str) -> Application:
+def create_application(token: str, polling: bool = True) -> Application:
     # A screenshot takes 10-16 s: one at a time, a button tapped meanwhile waits in line until Telegram expires it.
-    application = (ApplicationBuilder().token(token).post_init(_post_init).post_shutdown(_post_shutdown)
-                   .concurrent_updates(True).build())
+    builder = ApplicationBuilder().token(token).post_init(post_init).post_shutdown(post_shutdown).concurrent_updates(True)
+    if not polling:  # by webhook the updates come in through the API (app/bot/webhook.py)
+        builder = builder.updater(None)
+    application = builder.build()
     private = filters.ChatType.PRIVATE
     application.add_handler(CommandHandler("start", handlers.start_command, filters=private))
     application.add_handler(CommandHandler(["menu", "inicio"], handlers.menu_command, filters=private))
@@ -101,7 +106,21 @@ def main() -> None:
         raise SystemExit("Configura TELEGRAM_BOT_TOKEN en el archivo .env o en el entorno para iniciar el bot.")
     if not settings.BOT_API_SECRET:
         raise SystemExit("Falta BOT_API_SECRET. Ejecuta `python scripts/setup_local.py`.")
+    published = asyncio.run(_published_at(token))
+    if published and "--forzar" not in sys.argv:
+        # Polling deletes the webhook: the published bot would stop getting messages without anyone noticing.
+        raise SystemExit(f"El bot ya está publicado ({published}). Si lo inicias aquí, el servidor deja de recibir "
+                         "mensajes. Para traerlo a este computador de todos modos: python -m app.bot.client --forzar")
     create_application(token).run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+async def _published_at(token: str) -> str | None:
+    """The webhook's address when the bot runs on a server, so that a local start does not take it away."""
+    try:
+        async with Bot(token) as bot:
+            return (await bot.get_webhook_info()).url or None
+    except TelegramError:
+        return None
 
 
 if __name__ == "__main__":

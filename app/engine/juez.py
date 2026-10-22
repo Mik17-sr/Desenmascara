@@ -45,8 +45,10 @@ VERIFICA_LA_DEUDA = ("Antes de pagar, verifica la deuda con la empresa original 
 # PATRON_ALTO are specific enough to be high risk on their own; the false relative stays "sospechoso".
 PATRON_MODALIDAD = {"falso_familiar": "falso_familiar", "robo_de_cuenta": "robo_de_cuenta", "falsa_multa": "falso_funcionario",
                     "falso_empleo": "falso_empleo", "phishing": "suplantacion_bancaria", "cobro_falso": "cobro_falso",
-                    "falsa_compra": "falsa_compra"}
-PATRON_ALTO = {"robo_de_cuenta", "falsa_multa", "falso_empleo", "phishing", "cobro_falso", "falsa_compra"}
+                    "falsa_compra": "falsa_compra", "falso_premio": "falso_premio", "paquete_retenido": "paquete_retenido",
+                    "cuenta_bloqueada": "suplantacion_bancaria"}
+PATRON_ALTO = {"robo_de_cuenta", "falsa_multa", "falso_empleo", "phishing", "cobro_falso", "falsa_compra", "falso_premio",
+               "paquete_retenido"}
 P_PIDE ={"codigo_o_clave": 35, "instalar_app": 30, "mover_dinero": 30, "dinero": 20, "datos_personales": 20, "abrir_enlace": 10}
 # The false relative stays "sospechoso" (the guide's case 2): the Círculo confirms it with the real person.
 STRONG_MODALIDADES = {"suplantacion_bancaria", "falso_asesor", "falsa_compra", "paquete_retenido", "falso_funcionario",
@@ -227,9 +229,11 @@ def judge(e: Evidencia) -> AnalysisResult:
     modalidad = patron_modalidad or ai_modalidad
     if modalidad:
         add("MODALIDAD", MODALIDADES[modalidad][1], modalidad, SignalSource.PISTAS if patron_modalidad else SignalSource.PSICOLOGO, P_MODALIDAD)
-    if p and p.pide in P_PIDE and not (aviso_de_codigo and p.pide == "codigo_o_clave"):
-        add("PIDE_" + p.pide.upper(), PIDE_LABEL[p.pide], p.pide, SignalSource.PSICOLOGO, P_PIDE[p.pide])
-        recognized.append(f"Pide: {PIDE_CHIP[p.pide]}")
+    # What it asks for: the AI's reading, or the words themselves when there is no AI.
+    asked, asked_by = (p.pide, SignalSource.PSICOLOGO) if p else (e.pistas.pide, SignalSource.PISTAS)
+    if asked in P_PIDE and not (aviso_de_codigo and asked == "codigo_o_clave"):
+        add("PIDE_" + asked.upper(), PIDE_LABEL[asked], asked, asked_by, P_PIDE[asked])
+        recognized.append(f"Pide: {PIDE_CHIP[asked]}")
     presion = (p.presion if p else bool(e.pistas.urgencia)) or (bool(e.pistas.urgencia) and bool(e.pistas.patrones))
     if presion:
         add("PRESION", "Usa urgencia, amenazas o premios para que actúes sin pensar.",
@@ -269,17 +273,19 @@ def judge(e: Evidencia) -> AnalysisResult:
             banco_alto = banco_alto or hit.nivel >= 70
 
     score = max(0, min(100, sum(s.points for s in signals)))
-    pide = p.pide if p else None
+    pide = p.pide if p else e.pistas.pide
     if aviso_de_codigo and pide == "codigo_o_clave":
         pide = "nada"
     if imita and pide in ("datos_personales", "codigo_o_clave", "dinero"):
         score = max(score, 85)  # rule: the link impersonates an entity and the message asks for data
     if e.tipo == "llamada" and pide in ("codigo_o_clave", "instalar_app"):
         score = max(score, 85)  # rule: in a call they asked for a code or to install an app
-    if p and p.modalidad in STRONG_MODALIDADES and pide in HARMFUL_REQUESTS:
+    if modalidad in STRONG_MODALIDADES and pide in HARMFUL_REQUESTS:
         score = max(score, 75)  # rule: a known scam pattern that asks for money, a code or data
     if e.inyeccion or banco_alto:
         score = max(score, 70)  # rule: hidden orders for the AI, or a number the community marked red
+    if e.pistas.pide == "codigo_o_clave" and not aviso_de_codigo:
+        score = max(score, 75)  # rule: it asks in words to hand over a code or a password; no entity ever does
     if patron in PATRON_ALTO:
         score = max(score, 75)  # rule: a pattern of real scams: account theft, fake fine, easy-money job, phishing, fake sale
     if patron == "falso_familiar" or modalidad == "falso_familiar":

@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import text
 
 from app.api.routes import router as api_router
+from app.bot import webhook as telegram_webhook
 from app.core.config import settings
 from app.db.database import SessionLocal, init_db
 from app.engine.analyzer import warm_up
@@ -35,10 +36,15 @@ async def lifespan(app: FastAPI):
     await init_db()
     # Load every model before serving: "Application startup complete" means the first analysis is fast,
     # and OCR/Whisper loading does not compete for the CPU with the first requests.
-    await warm_up()
-    await warm_up_models()
+    if settings.IA_LOCAL:
+        await warm_up()
+    if settings.PRECARGAR_MODELOS:
+        await warm_up_models()
     background = [asyncio.create_task(_expire_calls_forever())]
+    app.state.telegram = await telegram_webhook.start()  # None on your computer: there the bot runs by polling
     yield
+    if app.state.telegram is not None:
+        await telegram_webhook.stop(app.state.telegram)
     for task in background:
         task.cancel()
         with suppress(asyncio.CancelledError):
@@ -58,6 +64,8 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Entity-API-Key", "X-Admin-Key"],  # Authorization: the panel session
 )
 app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(telegram_webhook.router)
+app.state.telegram = None
 
 
 @app.exception_handler(Exception)
@@ -76,11 +84,14 @@ async def health_check():
             with_demo = await demo.present(db)
     except Exception:
         database = "no disponible"
-    try:
-        async with httpx.AsyncClient(timeout=1.0) as client:
-            (await client.get(f"{settings.OLLAMA_HOST}/api/version")).raise_for_status()
-    except httpx.HTTPError:
-        ai = "no disponible"
+    if not settings.IA_LOCAL:
+        ai = "apagada"  # the rules answer alone
+    else:
+        try:
+            async with httpx.AsyncClient(timeout=1.0) as client:
+                (await client.get(f"{settings.OLLAMA_HOST}/api/version")).raise_for_status()
+        except httpx.HTTPError:
+            ai = "no disponible"
     return {
         "status": "ok" if database == "ok" else "degradado",
         "project": settings.PROJECT_NAME,

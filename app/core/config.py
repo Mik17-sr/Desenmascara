@@ -13,7 +13,12 @@ class Settings(BaseSettings):
     # 127.0.0.1 rather than localhost: on Windows, localhost tries IPv6 first and adds ~0.2 s per connection.
     OLLAMA_HOST: str = "http://127.0.0.1:11434"
     OLLAMA_MODEL: str = "llama3.2"
+    # False where there is no Ollama (Render): the rules answer alone, as calibrated, instead of "no concluyente".
+    IA_LOCAL: bool = True
     WHISPER_MODEL: str = "base"
+    # Load OCR and Whisper before serving. False on a small server (Render free: 512 MB, and it must wake fast):
+    # each model then loads with its first screenshot or voice note.
+    PRECARGAR_MODELOS: bool = True
     # Local SQLite when neither is set (see app/db/database.py); a PostgreSQL or Supabase URL also works.
     DATABASE_URL: Optional[str] = None
     SUPABASE_DB_URL: Optional[str] = None
@@ -32,5 +37,12 @@ class Settings(BaseSettings):
     # Telegram bot (app/bot/client.py).
     API_BASE_URL: str = "http://127.0.0.1:8000"
     TELEGRAM_BOT_TOKEN: Optional[str] = None
+    # How long the bot waits for a screenshot or a voice note; a slow server needs more.
+    BOT_TIMEOUT_IMAGEN: float = 20.0
+    BOT_TIMEOUT_VOZ: float = 30.0
+    # With a public address the bot runs inside the API by webhook (app/bot/webhook.py) instead of polling.
+    # Render sets RENDER_EXTERNAL_URL by itself; TELEGRAM_WEBHOOK_URL is for any other server.
+    TELEGRAM_WEBHOOK_URL: Optional[str] = None
+    RENDER_EXTERNAL_URL: Optional[str] = None
 
 settings = Settings()

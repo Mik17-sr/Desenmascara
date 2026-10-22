@@ -41,6 +41,20 @@ CODE_WARNING = re.compile(r"no\s+(?:lo|la)\s+compartas|no\s+compartas|nunca\s+te
 # "489370 es tu código de verificación para U Distrital App": it hands over a code without warning.
 CODE_DELIVERY = re.compile(r"\b(?:es\s+tu|es\s+su|tu|su)\s+codigo\b|\bcodigo\s+de\s+(?:verificacion|seguridad|acceso|confirmacion)\b")
 ASKS_BACK = re.compile(r"envi|reenvi|dime|digame|dicta|dictame|compart(?:e|eme|ir)\b|respond|escribe|escribeme|manda|llama\s+al|ingresa|entra\s+a")
+# Someone asking to hand over a code or a password: "dígame el código", "¿me lo reenvías?", "responde con ese código".
+# Only requests to the reader: "te enviamos un código" or "no lo compartas" are not one.
+ASK_CODE = re.compile(
+    r"\b(?:digame|dime|dicteme|dictame|reenviame|reenvialo|reenviamelo|enviame|mandame|pasame|compartelo|comparteme"
+    r"|envia\s+(?:tu|el)|envie\s+(?:su|el)|actualice\s+su|actualiza\s+tu|ingrese\s+su|ingresa\s+tu|confirme\s+su|confirma\s+tu"
+    r"|digite\s+su|digita\s+tu|escriba\s+su|escribe\s+tu)\b[^.?!]{0,50}?\b(?:codigo|clave|contrasena|pin|token)\b"
+    r"|\b(?:codigo|clave|contrasena)\b[^.]{0,80}?\bme\s+lo\s+(?:reenvias|envias|dices|dictas|pasas|compartes)\b"
+    r"|\brespond\w*[^.?!]{0,40}?\bcon\s+(?:ese|el|tu)\s+codigo\b"
+)
+# Asking for personal or account data: "valide sus datos", "envía tu nombre, tu cédula".
+ASK_DATA = re.compile(
+    r"\b(?:valid|verifi|actualic|actualiz|confirm|ingres|envi|mand|escrib|digit)\w*\s+(?:sus|tus|su|tu)\s+"
+    r"(?:datos|cedula|documento|nombre|tarjeta|numero\s+de\s+tarjeta|cvv|usuario)\b"
+)
 URGENCY_WORDS = [
     "urgente", "inmediat", "hoy mismo", "solo hoy", "solo por hoy", "ultimo aviso", "bloque", "suspend", "24 horas",
     "48 horas", "embargo", "multa", "decomiso", "cobro juridico", "no le digas", "no le diga", "antes de que",
@@ -58,6 +72,17 @@ PATRONES = {
                         "soportedetelegram", "soportedefacebook", "soportedeinstagram"),),
     "falsa_multa": (("sancionvial", "comparendo", "fotomulta", "infractor", "multadetransito"),
                     ("descuento", "descto", "dto", "embargo", "decomiso", "cobrojuridico", "ingresa", "paga", "cancela")),
+    # The guide's other modalities, so that the rules alone catch them where there is no AI.
+    "falso_premio": (("ganaste", "ganador", "sorteo", "premio", "fuisteseleccionad", "hassidoseleccionad"),
+                     ("reclam", "pararecibir", "enviatu", "envianos", "respondeaeste", "conesecodigo", "pagaelenvio", "cedula")),
+    "paquete_retenido": (("paqueteretenido", "paqueteestaretenido", "envioretenido", "pedidoretenido", "retenidoenaduana",
+                          "paquetenopudoserentregado"),
+                         ("pague", "paga", "pagar", "saldopendiente", "liberar", "tarifa", "arancel")),
+    # Not high by itself (banks send real alerts too): high when it also asks for data or a code.
+    "cuenta_bloqueada": (("serabloquead", "serasuspendid", "seracancelad", "fuebloquead", "hasidobloquead", "cuentabloquead",
+                          "cuentasuspendid", "actividadinusual", "actividadsospechosa", "compranoreconocida", "movimientoinusual"),
+                         ("valide", "valida", "verifique", "verifica", "actualice", "actualiza", "confirme", "confirma", "ingrese",
+                          "ingresa", "codigo", "clave")),
     # A sale that asks for an advance, or to go on in another app: the guide's fake purchase, without waiting for the AI.
     "falsa_compra": (("vendo", "venta", "remate", "anuncio", "articulo", "producto", "enviogratis"),
                      ("anticipo", "apartar", "apartalo", "apartala", "separar", "separalo", "separala", "abono", "poradelantado",
@@ -120,6 +145,8 @@ class Pistas:
     enlace_disfrazado: bool = False
     menciona_familia: bool = False
     pide_dinero: bool = False
+    # What it asks for, by its words (the AI's "pide" when the AI is not there): codigo_o_clave, datos_personales or None.
+    pide: str | None = None
     # A way to pay or talk that came inside the message: a shortened or disguised link, a chat link or a payment reference.
     canal_del_mensaje: bool = False
 
@@ -198,6 +225,7 @@ def extract(text: str, entity_names: list[str] | None = None) -> Pistas:
         enlace_disfrazado=bool(disguised),
         menciona_familia=bool(FAMILY_WORDS & set(re.findall(r"\w+", lowered))) or any(w in squashed for w in FAMILY_SQUASHED),
         pide_dinero=bool(llaves or cuentas) or any(w in squashed for w in MONEY_ASK),
+        pide="codigo_o_clave" if ASK_CODE.search(lowered) else "datos_personales" if ASK_DATA.search(lowered) else None,
         canal_del_mensaje=(bool(disguised) or "pago_referencia" in patrones or bool(phones) or any(h in SHORTENERS | CHAT_LINKS for h in hosts)
                            or any(w in squashed for w in CONTACT_WORDS)),
     )

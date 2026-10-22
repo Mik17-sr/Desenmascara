@@ -9,6 +9,7 @@ import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.engine import archivista, enlaces, oficiales, pistas as pistas_mod
 from app.engine.analyzer import INJECTION_PATTERN, MAX_MODEL_CHARS, classify
 from app.engine.juez import Evidencia, judge
@@ -35,7 +36,7 @@ async def analyze(session: AsyncSession, payload: AnalysisInput) -> tuple[Analys
 
     injection = bool(INJECTION_PATTERN.search(payload.text))
     psicologia, ages, flagged = await asyncio.gather(
-        _no_ai() if injection else classify(payload.text),
+        _no_ai() if injection or not settings.IA_LOCAL else classify(payload.text),
         enlaces.domain_ages(unofficial),
         enlaces.reputation(urls),
     )
@@ -50,7 +51,7 @@ async def analyze(session: AsyncSession, payload: AnalysisInput) -> tuple[Analys
     huella = archivista.fingerprint(payload.text)
     evidencia = Evidencia(
         tipo=payload.tipo, pistas=found, links=checks, ages=ages, flagged_urls=flagged, psicologia=psicologia,
-        ia_consultada=not injection, inyeccion=injection, campana=await verificaciones.best_campaign(session, huella), banco=hits,
+        ia_consultada=settings.IA_LOCAL and not injection, inyeccion=injection, campana=await verificaciones.best_campaign(session, huella), banco=hits,
     )
     result = judge(evidencia)
     if len(payload.text) > MAX_MODEL_CHARS and not injection:
