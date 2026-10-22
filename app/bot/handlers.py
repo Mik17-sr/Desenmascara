@@ -24,8 +24,8 @@ from telegram.ext import ContextTypes
 from app.bot import textos
 from app.bot.api import IMAGE_TIMEOUT, VOICE_TIMEOUT, Api, ApiError
 from app.bot.formatters import (
-    SEMAFORO, b, esc, format_analysis, format_call, format_code, format_heard, format_not_connected, format_number, format_report, header,
-    join,
+    b, esc, format_analysis, format_call, format_code, format_heard, format_kit, format_not_connected, format_number, format_report,
+    header, join,
 )
 from app.core.security import normalize_phone
 from app.engine.enlaces import registered_domain
@@ -216,7 +216,7 @@ async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except ApiError as error:
         await _api_error(update, context, error)
         return
-    await _deliver(update, context, out, out["resultado"].get("extracted_text") or "", tipo)
+    await _deliver(update, context, out, out["resultado"].get("extracted_text") or "", tipo, fuente="captura")
 
 
 async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -235,7 +235,7 @@ async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _api_error(update, context, error)
         return
     heard = out["resultado"].get("extracted_text") or ""
-    await _deliver(update, context, out, heard, "llamada", heard=heard)
+    await _deliver(update, context, out, heard, "llamada", heard=heard, fuente="voz")
 
 
 async def on_unsupported(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -261,30 +261,37 @@ async def _analyze_text(update: Update, context: ContextTypes.DEFAULT_TYPE, text
     await _deliver(update, context, out, text, tipo)
 
 
-def _remember(context: ContextTypes.DEFAULT_TYPE, result: AnalysisResult, text: str) -> list[tuple[str, str]]:
+def _remember(context: ContextTypes.DEFAULT_TYPE, result: AnalysisResult, text: str, fuente: str = "texto") -> list[tuple[str, str]]:
     found = extract(text)
     reportables = [("telefono", v) for v in found.telefonos] + [("llave", v) for v in found.llaves] + [("cuenta", v) for v in found.cuentas]
     # Links too, by their domain, but never a shortener, a chat link or an official site: that would brand a real service.
     official = {site for sites in official_websites().values() for site in sites}
+    enlaces = []
     for url in found.urls:
         host = (urlsplit(url).hostname or "").removeprefix("www.")
         domain = registered_domain(host)
-        if host not in SHORTENERS | CHAT_LINKS and domain not in official and ("enlace", domain) not in reportables:
+        if domain in official:
+            continue
+        enlaces.append(url)
+        if host not in SHORTENERS | CHAT_LINKS and ("enlace", domain) not in reportables:
             reportables.append(("enlace", domain))
     context.user_data["reportables"] = reportables[:5]
     context.user_data["reportar_modalidad"] = result.modalidad
     context.user_data["ultima_verificacion"] = result.verification_id
+    now = datetime.now(COLOMBIA)
     context.user_data["ultimo"] = {
         "texto": text[:600], "nivel": result.risk_level.value, "puntaje": result.risk_score, "categoria": result.category,
-        "fecha": datetime.now(COLOMBIA).strftime("%d/%m/%Y %H:%M"), "enlaces": found.urls[:5],
-        "numeros": [v for _, v in reportables[:5]],
+        "fecha": f"{now:%d/%m/%Y}, {now.hour % 12 or 12}:{now:%M} {'a. m.' if now.hour < 12 else 'p. m.'}",
+        "fuente": fuente, "enlaces": enlaces[:5], "datos": reportables[:8],
+        "referencia": f"DSM-{result.verification_id.replace('-', '')[:8].upper()}" if result.verification_id else None,
     }
     return reportables
 
 
-async def _deliver(update: Update, context: ContextTypes.DEFAULT_TYPE, out: dict, text: str, tipo: str, heard: str | None = None) -> None:
+async def _deliver(update: Update, context: ContextTypes.DEFAULT_TYPE, out: dict, text: str, tipo: str, heard: str | None = None,
+                   fuente: str = "texto") -> None:
     result = AnalysisResult.model_validate(out["resultado"])
-    reportables = _remember(context, result, text)
+    reportables = _remember(context, result, text, fuente)
     questions = out.get("preguntas_circulo") or []
     if questions:
         await _ask_circle(update, context, questions, text, result)
@@ -454,7 +461,7 @@ async def _check_number(update: Update, context: ContextTypes.DEFAULT_TYPE, text
         if reporting:
             info = await _api(context).post("/bot/reportar", json=_who(update) | {
                 "valor": text, "tipo": "telefono", "modalidad": context.user_data.get("reportar_modalidad")})
-            await _reply(update, format_report(info))
+            await _reply(update, format_report([info]))
             return
         info = await _api(context).post("/bot/numero", json=_who(update) | {"valor": text, "tipo": "telefono"})
     except ApiError as error:
@@ -471,17 +478,23 @@ async def _report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not items:
         await _reply(update, esc("No encontré números, llaves ni cuentas para reportar en lo último que revisamos."))
         return
-    last = None
+    context.user_data["reportables"] = []  # a second tap while this runs finds nothing left to send twice
+    reports = []
     for tipo, valor in items:
         try:
-            last = await _api(context).post("/bot/reportar", json=_who(update) | {
+            reports.append(await _api(context).post("/bot/reportar", json=_who(update) | {
                 "valor": valor, "tipo": tipo, "modalidad": context.user_data.get("reportar_modalidad"),
-                "verificacion_id": context.user_data.get("ultima_verificacion")})
+                "verificacion_id": context.user_data.get("ultima_verificacion")}))
         except ApiError as error:
+            context.user_data["reportables"] = items[len(reports):]
             await _api_error(update, context, error)
             return
-    context.user_data["reportables"] = []
-    await _reply(update, format_report(last) if len(items) == 1 else esc(f"Reporté {len(items)} números o llaves. Gracias por proteger a otros."))
+    last = context.user_data.get("ultimo")
+    from_last = last is not None and all(item in last["datos"] for item in items)
+    if from_last:
+        last["reportado"] = True
+    await _reply(update, format_report(reports),
+                 reply_markup=InlineKeyboardMarkup([[Btn("Kit de denuncia", callback_data="kit")]]) if from_last else None)
 
 
 async def _review(update: Update, context: ContextTypes.DEFAULT_TYPE, reason: str) -> None:
@@ -512,19 +525,7 @@ async def _send_kit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not last:
         await _reply(update, esc("Primero envíame el mensaje, la captura o el número que quieres denunciar y te armo el kit."))
         return
-    word = SEMAFORO[last["nivel"]][1]
-    result = f"{word} · {last['puntaje']}/100" + (f" · {last['categoria']}" if last["categoria"] else "")
-    await _reply(update, join(
-        b("Kit de denuncia"),
-        esc(f"Fecha: {last['fecha']} (hora de Colombia)"),
-        esc(f"Resultado de Desenmascara: {result}"),
-        esc(f"Mensaje: «{last['texto']}»"),
-        esc("Enlaces: " + ", ".join(last["enlaces"])) if last["enlaces"] else None,
-        esc("Números o llaves: " + ", ".join(last["numeros"])) if last["numeros"] else None,
-        "",
-        b("Envíalo a:"),
-        *[esc(f"• {line}") for line in textos.LINEAS_DENUNCIA],
-    ))
+    await _reply(update, format_kit(last, textos.LINEAS_DENUNCIA))
 
 
 async def _ya_cai(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -557,7 +558,10 @@ async def _choose(update: Update, context: ContextTypes.DEFAULT_TYPE, option: st
 
 async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except TelegramError:  # the tap waited too long for Telegram to accept the answer: still do what was asked
+        logger.info("Late button answer")
     data = query.data or ""
     if data == "consent":
         try:

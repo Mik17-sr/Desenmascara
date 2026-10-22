@@ -235,3 +235,10 @@ def test_without_ai_or_signals_it_is_inconclusive():
     no_ai = judge(evidence("BancoAndino: valide sus datos hoy en bancoandino-seguro.co", None))
     assert no_ai.risk_level in (RiskLevel.MEDIUM, RiskLevel.HIGH)
     assert any("IA" in item for item in no_ai.limitations)
+
+
+def test_links_the_ocr_glued_together_are_put_back():
+    # A real screenshot: "Info: 601 756 0385 wa.me/" with "+57 304 472 2062" on the next line, without spaces.
+    found = extract("SystemGroup.Info\n6017560385wa.me/\n+573044722062\nInfo6017560385wa.me/")
+    assert found.urls == ["https://systemgroup.info", "https://wa.me/+573044722062"]
+    assert found.telefonos == ["576017560385", "573044722062"]

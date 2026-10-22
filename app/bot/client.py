@@ -72,7 +72,9 @@ async def _post_shutdown(application: Application) -> None:
 
 
 def create_application(token: str) -> Application:
-    application = ApplicationBuilder().token(token).post_init(_post_init).post_shutdown(_post_shutdown).build()
+    # A screenshot takes 10-16 s: one at a time, a button tapped meanwhile waits in line until Telegram expires it.
+    application = (ApplicationBuilder().token(token).post_init(_post_init).post_shutdown(_post_shutdown)
+                   .concurrent_updates(True).build())
     private = filters.ChatType.PRIVATE
     application.add_handler(CommandHandler("start", handlers.start_command, filters=private))
     application.add_handler(CommandHandler(["menu", "inicio"], handlers.menu_command, filters=private))

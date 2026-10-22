@@ -88,9 +88,9 @@ YA_CAI_PASOS = {
     ],
 }
 LINEAS_DENUNCIA = [
-    "La línea de fraudes de tu banco (al respaldo de tu tarjeta)",
-    "A Denunciar, de la Policía: adenunciar.policia.gov.co",
-    "CAI Virtual: caivirtual.policia.gov.co",
+    "La línea de fraudes de tu banco, al respaldo de tu tarjeta, si diste datos o dinero.",
+    "A Denunciar, de la Policía Nacional: adenunciar.policia.gov.co",
+    "CAI Virtual de la Policía: caivirtual.policia.gov.co",
 ]
 AYUDA = join(
     b("Cómo usarme"),

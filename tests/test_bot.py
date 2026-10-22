@@ -3,10 +3,11 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from telegram.error import BadRequest
 
 from app.bot import client, handlers, textos
 from app.bot.formatters import (
-    format_analysis, format_call, format_code, format_heard, format_not_connected, format_number, format_report,
+    format_analysis, format_call, format_code, format_heard, format_kit, format_not_connected, format_number, format_report,
 )
 from app.schemas.contract import AnalysisResult, SignalItem, SignalSource
 
@@ -42,6 +43,11 @@ def result(level="high", score=96, summary="Es muy probable que sea una estafa."
     return AnalysisResult(risk_level=level, risk_score=score, summary=summary, **kwargs)
 
 
+KIT = {"nivel": "high", "puntaje": 100, "categoria": "Posible cobranza falsa", "fecha": "21/10/2026, 10:48 p. m.",
+       "fuente": "captura", "referencia": "DSM-1A2B3C4D", "texto": "Systemgroup y Credivalores…",
+       "datos": [("telefono", "576017560385"), ("telefono", "573044722062"), ("enlace", "systemgroup.info")],
+       "enlaces": ["https://systemgroup.info", "https://wa.me/+573044722062"]}
+
 SIGNAL = SignalItem(code="ENLACE_IMITA_OFICIAL", label="El enlace no es la página oficial de BancoAndino.",
                     evidence="bancoandino-seguro.co", source=SignalSource.ENLACES, points=30)
 
@@ -63,8 +69,11 @@ SIGNAL = SignalItem(code="ENLACE_IMITA_OFICIAL", label="El enlace no es la pági
     format_number({"encontrado": True, "valor": "+57 601 ••• 0002", "oficial_de": "BancoAndino", "nivel": 0}),
     format_number({"encontrado": False}),
     format_number({"encontrado": True, "estado": "en_revision", "nivel": 40, "personas": 2, "reportes": 2}),
-    format_report({"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 3}),
-    format_report({"nuevo": False}),
+    format_report([{"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 3}]),
+    format_report([{"nuevo": True, "valor": "systemgroup.info", "personas": 1}, {"nuevo": False, "valor": "+57 320 ••• 1234", "personas": 2}]),
+    format_report([{"nuevo": False, "valor": "+57 320 ••• 1234", "personas": 2}]),
+    format_kit(KIT, textos.LINEAS_DENUNCIA),
+    format_kit(KIT | {"fuente": "texto", "referencia": None, "reportado": True}, textos.LINEAS_DENUNCIA),
     *[value for name, value in vars(textos).items() if name.isupper() and isinstance(value, str)],
 ])
 def test_every_message_is_valid_markdown_v2(message):
@@ -80,18 +89,18 @@ def test_analysis_leads_with_the_semaforo_and_says_what_to_do():
 def test_counts_of_one_read_well():
     number = format_number({"encontrado": True, "valor": "+57 320 ••• 1234", "nivel": 72, "personas": 1, "reportes": 1, "estado": "normal"})
     assert "*1 reporte* de 1 persona\\." in number
-    assert "*1 persona* que lo reportó\\." in format_report({"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 1})
-    assert "*3 personas* que lo reportaron\\." in format_report({"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 3})
+    assert "1 persona lo reportó" in format_report([{"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 1}])
+    assert "3 personas lo reportaron" in format_report([{"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 3}])
 
 
 def test_a_bank_that_has_not_joined_is_never_called_false():
     message = format_not_connected({"estado": "no_conectada", "entidad": "Bancolombia", "sitio": "bancolombia.com"})
-    assert message.startswith("🟡 *NO PUEDO CONFIRMARLO*") and "bancolombia\.com" in message and "NO ES TU BANCO" not in message
+    assert message.startswith("🟡 *NO PUEDO CONFIRMARLO*") and "bancolombia\\.com" in message and "NO ES TU BANCO" not in message
 
 
 def test_a_published_line_tells_where_to_call_but_not_that_a_call_is_real():
     message = format_number({"encontrado": True, "valor": "(601) 343 0000", "oficial_de": "Bancolombia", "sitio": "bancolombia.com", "nivel": 0})
-    assert message.startswith("🟢 *LÍNEA OFICIAL*") and "se puede falsificar" in message and "bancolombia\.com" in message
+    assert message.startswith("🟢 *LÍNEA OFICIAL*") and "se puede falsificar" in message and "bancolombia\\.com" in message
     call = format_not_connected({"estado": "no_conectada", "entidad": "Bancolombia", "linea": "01 8000 9 12345"})
     assert "01 8000 9 12345" in call
 
@@ -102,6 +111,35 @@ def test_links_can_be_reported_but_never_a_shortener_a_chat_or_an_official_site(
     reportables = handlers._remember(context, result("high", 80), text)
     assert ("enlace", "cuctly.cc") in reportables
     assert not any(valor in ("bit.ly", "wa.me", "bancolombia.com") for _, valor in reportables)
+
+
+def test_the_kit_is_ready_for_the_police():
+    kit = format_kit(KIT, textos.LINEAS_DENUNCIA)
+    assert kit.startswith("📋 *KIT DE DENUNCIA*") and "DSM\\-1A2B3C4D" in kit
+    assert "`+57 601 756 0385`" in kit and "`+57 304 472 2062`" in kit
+    # Links in a box, so that nobody opens them by mistake; a screenshot is attached, not its OCR text.
+    assert "`https://wa.me/+573044722062`" in kit and "Systemgroup y Credivalores" not in kit and "Adjunta la captura" in kit
+    assert "adenunciar\\.policia\\.gov\\.co" in kit
+    typed = format_kit(KIT | {"fuente": "texto", "texto": "Hola,\n\n  paga  hoy"}, textos.LINEAS_DENUNCIA)
+    assert "_«Hola, paga hoy»_" in typed
+
+
+def test_reporting_answers_with_what_went_into_the_banco():
+    api = FakeApi({"/bot/reportar": lambda body: {"nuevo": True, "valor": body["valor"], "personas": 2}})
+    update, context = fake(None, api)
+    reportables = handlers._remember(context, result("high", 90), "Paga en systemgroup.info o al 304 472 2062")
+    asyncio.run(handlers._report(update, context))
+    message, = replies(update)
+    assert message.startswith("✅ *REPORTE RECIBIDO*") and "2 personas lo reportaron" in message
+    assert [body["valor"] for _, body in api.calls] == [valor for _, valor in reportables]
+    assert context.user_data["ultimo"]["reportado"] and context.user_data["reportables"] == []
+
+
+def test_a_late_button_tap_still_does_what_was_asked():
+    update, context = fake(None, FakeApi({}))
+    update.callback_query = SimpleNamespace(data="kit", answer=AsyncMock(side_effect=BadRequest("Query is too old")))
+    asyncio.run(handlers.on_button(update, context))
+    assert "Primero envíame" in replies(update)[0]
 
 
 def test_the_same_reason_is_said_once():

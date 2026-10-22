@@ -8,6 +8,7 @@ Rules from the guide (section 8): the semáforo with its word on the first line,
 import re
 from typing import Any
 
+from app.core.security import normalize_phone
 from app.engine.pistas import plural
 from app.schemas.contract import AnalysisResult
 
@@ -168,13 +169,59 @@ def format_number(info: dict) -> str:
     )
 
 
-def format_report(info: dict) -> str:
-    if not info["nuevo"]:
-        return esc("Ya tenías un reporte de este número: cada persona cuenta una sola vez. Gracias por proteger a otros.")
-    personas = info["personas"]
-    return join(
-        b("Reportado"),
-        f"{esc(info['valor'])} {esc('ya tiene')} {b(plural(personas, 'persona', 'personas'))} "
-        f"{esc('que lo reportó.' if personas == 1 else 'que lo reportaron.')}",
-        esc("Si alguien más pregunta por él, le avisaremos. Gracias por proteger a otros."),
-    )
+def format_report(reports: list[dict]) -> str:
+    """The answer to «Reportar»: what went into the Banco and how many people back it, never the full number."""
+    if not any(r["nuevo"] for r in reports):
+        return join(
+            f"✅ {b('YA LO HABÍAS REPORTADO')}",
+            esc("Cada persona cuenta una sola vez. Gracias por proteger a otros."),
+        )
+    lines = [f"✅ {b('REPORTE RECIBIDO')}", esc("Gracias. Quedó registrado en el Banco de números de Desenmascara:")]
+    for r in reports:
+        count = plural(r["personas"], "persona lo reportó", "personas lo reportaron") if r["nuevo"] else "ya lo habías reportado"
+        lines.append(f"• {code(r['valor'])} · {esc(count)}")
+    one = len(reports) == 1
+    lines.append(esc(f"Si alguien más pregunta por {'este dato' if one else 'estos datos'}, le avisaremos que "
+                     f"{'tiene' if one else 'tienen'} reportes."))
+    return join(*lines)
+
+
+TIPO_DATO = {"telefono": "Teléfono", "llave": "Llave Bre-B", "cuenta": "Cuenta"}
+FUENTE = {"texto": "mensaje de texto", "captura": "captura de pantalla", "voz": "nota de voz"}
+
+
+def pretty_phone(value: str) -> str:
+    """'573044722062' -> '+57 304 472 2062': the kit is for the police, so it shows the number whole."""
+    digits = normalize_phone(value) or ""
+    return f"+57 {digits[2:5]} {digits[5:8]} {digits[8:]}" if digits.startswith("57") and len(digits) == 12 else value
+
+
+def format_kit(kit: dict, lineas: list[str]) -> str:
+    """A summary to hand to the bank or the police. Links go in a box so that nobody opens them by mistake."""
+    dot, word = SEMAFORO[kit["nivel"]]
+    resultado = f"{word} · {kit['puntaje']}/100"
+    fuente = kit.get("fuente", "texto")
+    datos = [(tipo, valor) for tipo, valor in kit.get("datos", []) if tipo in TIPO_DATO]
+    lines = [
+        f"📋 {b('KIT DE DENUNCIA')}",
+        it(f"Desenmascara · Referencia {kit['referencia']}") if kit.get("referencia") else None,
+        "",
+        f"{b('Fecha:')} {esc(kit['fecha'] + ' (hora de Colombia)')}",
+        f"{b('Resultado:')} {dot} {esc(resultado)}",
+        f"{b('Modalidad:')} {esc(kit['categoria'])}" if kit.get("categoria") else None,
+        f"{b('Evidencia:')} {esc(FUENTE[fuente])}",
+        f"{b('Reporte:')} {esc('registrado en el Banco de números de Desenmascara.')}" if kit.get("reportado") else None,
+    ]
+    if datos or kit.get("enlaces"):
+        lines += ["", b("Datos que aparecen en el mensaje")]
+        lines += [f"• {esc(TIPO_DATO[tipo])}: {code(pretty_phone(valor) if tipo == 'telefono' else valor)}" for tipo, valor in datos]
+        lines += [f"• {esc('Enlace')}: {code(url)}" for url in kit.get("enlaces", [])]
+    if fuente == "captura":
+        lines += ["", f"{b('Adjunta la captura original')} {esc('a tu denuncia: es la prueba.')}"]
+    elif kit.get("texto"):
+        snippet = " ".join(kit["texto"].split())
+        snippet = snippet if len(snippet) <= 500 else snippet[:497] + "…"
+        lines += ["", b("Lo que se escuchó" if fuente == "voz" else "Mensaje recibido"), it(f"«{snippet}»")]
+    lines += ["", b("Dónde denunciar"), *[esc(f"{n}. {line}") for n, line in enumerate(lineas, 1)],
+              "", f"{b('Consejo:')} {esc('no borres el chat ni las capturas, y no respondas más a ese número.')}"]
+    return join(*lines)

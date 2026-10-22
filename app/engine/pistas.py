@@ -3,7 +3,7 @@
 import re
 import unicodedata
 from dataclasses import dataclass, field
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from app.core.security import normalize_phone
 
@@ -12,6 +12,10 @@ URL_PATTERN = re.compile(
     r"(?i)(?:https?://|\bwww\.)[^\s<>\"']+"  # no \b before "http": OCR glues it to the word before ("WhatsApphttps://")
     rf"|(?<![@\w.-])(?:[a-z0-9](?:[a-z0-9-]{{0,61}}[a-z0-9])?\.)+{_TLDS}\b(?:/[^\s<>\"']*)?"
 )
+# OCR drops a screenshot's spaces and line breaks: "Info: 601 756 0385 wa.me/" with "+57 304 472 2062" on the next line
+# comes out as "Info6017560385wa.me/" and "+573044722062".
+GLUED_CHAT_LINK = re.compile(r"(?i)(?<=\d)(?=(?:wa|t)\.me/)")
+BROKEN_CHAT_LINK = re.compile(r"(?i)\b((?:wa|t)\.me/)\s+(?=\+?\d)")
 PHONE_PATTERN = re.compile(r"(?<![\d$])(?:\+?57[\s.-]?)?(?:3\d{2}|60\d)[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)")
 LLAVE_PATTERN = re.compile(
     r"(?i)llave(?:\s*bre-?b)?\s*[:\-]?\s*(@[\w.\-]{3,30}|[\w.+-]+@[\w-]+\.[\w.]+|\d[\d\s]{6,14}\d)"
@@ -128,6 +132,7 @@ def find_patterns(squashed: str) -> list[str]:
 def extract_urls(text: str) -> list[str]:
     """URL-shaped strings, also bare domains such as 'banco-seguro.co/validar'. They are never opened."""
     urls = []
+    text = BROKEN_CHAT_LINK.sub(r"\1", GLUED_CHAT_LINK.sub(" ", text))
     for match in URL_PATTERN.finditer(text):
         url = match.group(0).rstrip(".,!?;:")
         while url.endswith(")") and url.count(")") > url.count("("):
@@ -138,8 +143,10 @@ def extract_urls(text: str) -> list[str]:
             parsed = urlsplit(url)
         except ValueError:
             continue
+        if parsed.hostname in CHAT_LINKS and not parsed.path.strip("/"):
+            continue  # "wa.me/" alone, its number lost: it leads nowhere
         if parsed.scheme in {"http", "https"} and parsed.hostname and "." in parsed.hostname:
-            urls.append(url)
+            urls.append(urlunsplit(parsed._replace(scheme=parsed.scheme.lower(), netloc=parsed.netloc.lower())))
     return list(dict.fromkeys(urls))
 
 
