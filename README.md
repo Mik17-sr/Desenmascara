@@ -1,6 +1,6 @@
 # Desenmascara · Guía Técnica del Proyecto
 
-**Evento:** Colombia 5.0 Hackathon (16 al 18 de octubre de 2026)  
+**Evento:** Colombia 5.0 Hackathon (22 al 23 de octubre de 2026)  
 **Versión:** 7.0 · Edición Telegram Nativo  
 **Canal Ciudadano:** Telegram Bot API ([@Desenmascara_bot](https://t.me/Desenmascara_bot))  
 **Equipo:** Luis Guillermo Nieto Patiño · Miguel · Gerhard Arce · IngBocadillo  
