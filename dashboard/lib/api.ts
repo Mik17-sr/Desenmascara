@@ -1,5 +1,6 @@
 // The Dashboard only reads anonymous, aggregated views of the API (guide section 16).
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+// `||`, not `??`: a variable left empty in the host (Render) must not turn every call into a 404 on the Dashboard itself.
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1").replace(/\/+$/, "");
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
