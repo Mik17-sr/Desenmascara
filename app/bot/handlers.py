@@ -24,7 +24,7 @@ from telegram.ext import ContextTypes
 from app.bot import textos
 from app.bot.api import IMAGE_TIMEOUT, VOICE_TIMEOUT, Api, ApiError
 from app.bot.formatters import (
-    b, esc, format_analysis, format_call, format_code, format_heard, format_kit, format_not_connected, format_number, format_report,
+    b, code, esc, format_analysis, format_call, format_code, format_heard, format_kit, format_not_connected, format_number, format_report,
     header, join,
 )
 from app.core.security import normalize_phone
@@ -169,7 +169,9 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     elif YA_CAI.search(text):
         await _choose(update, context, "6")
     elif modo == "circulo_nombre":
-        await _invite(update, context, text)
+        await _ask_relative_phone(update, context, text)
+    elif modo == "circulo_telefono":
+        await _invite(update, context, context.user_data.get("familiar_nombre") or "tu familiar", text)
     elif modo == "revision_motivo":
         await _review(update, context, text)
     elif context.user_data.get("codigo_pendiente") and CODE.search(text) and len(text) <= 60:
@@ -186,6 +188,10 @@ async def on_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     contact = update.effective_message.contact
     if contact.user_id != update.effective_user.id:
         await _reply(update, esc("Comparte tu propio número con el botón, no el de otra persona."))
+        return
+    token = context.user_data.pop("invitacion_token", None)
+    if token:  # accepting a Círculo invitation: the number proves who accepts
+        await _accept_invitation(update, context, token, contact.phone_number)
         return
     try:
         await _api(context).post("/bot/telefono", json=_who(update) | {"telefono": contact.phone_number})
@@ -372,25 +378,49 @@ async def _show_circle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     lines.append(esc("Miembros: " + ", ".join(info["miembros"])) if info["miembros"] else esc("Todavía no tienes familiares en tu Círculo."))
     if info["pendientes"]:
         lines.append(esc("Invitaciones sin aceptar: " + ", ".join(info["pendientes"])))
+    waiting = info.get("por_aprobar") or []
+    if waiting:
+        lines.append(f"{b('Esperan tu confirmación:')} {esc(', '.join(m['nombre'] for m in waiting))}")
     lines.append(esc("Si alguien te escribe diciendo ser de tu familia, le preguntaré al familiar real antes de que hagas algo."))
-    buttons = [[Btn("Agregar familiar", callback_data="c_add")]]
+    buttons = [[Btn(f"Sí, es {m['nombre']}", callback_data=f"apr:{m['id']}:1"), Btn("No lo conozco", callback_data=f"apr:{m['id']}:0")]
+               for m in waiting]
+    buttons.append([Btn("Agregar familiar", callback_data="c_add")])
     if info["miembros"] or info["pendientes"]:
         buttons.append([Btn("Salir del Círculo", callback_data="c_leave")])
     await _reply(update, join(*lines), reply_markup=InlineKeyboardMarkup(buttons))
 
 
-async def _invite(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str) -> None:
-    context.user_data["modo"] = None
+async def _ask_relative_phone(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str) -> None:
+    """The relative's number goes with the invitation: only the person with that number can accept it."""
+    context.user_data["familiar_nombre"] = name.strip()[:60]
+    context.user_data["modo"] = "circulo_telefono"
+    await _reply(update, join(
+        f"{esc('¿Cuál es el número de celular de')} {b(name.strip()[:60])}{esc('?')}",
+        esc("Así compruebo que quien acepte la invitación sea de verdad esa persona, y no alguien que recibió el enlace."),
+    ))
+
+
+async def _invite(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str, phone: str) -> None:
+    if normalize_phone(phone) is None:
+        await _reply(update, esc("No reconocí ese número. Escríbelo con todos sus dígitos, por ejemplo 310 000 0000."))
+        return
     try:
-        token = (await _api(context).post("/bot/circulo/invitar", json=_who(update) | {"familiar": name[:60]}))["token"]
+        out = await _api(context).post("/bot/circulo/invitar", json=_who(update) | {"familiar": name[:60], "telefono": phone})
     except ApiError as error:
+        if error.status == 422:  # their own number, or one that does not read as a phone
+            await _reply(update, esc(error.detail))
+            return
         await _api_error(update, context, error)
         return
-    link = f"https://t.me/{context.bot.username}?start=c_{token}"
+    context.user_data["modo"] = None
+    context.user_data.pop("familiar_nombre", None)
+    link = f"https://t.me/{context.bot.username}?start=c_{out['token']}"
     await _reply(update, join(
         f"{esc('Listo. Reenvíale este enlace a')} {b(name)}{esc(':')}",
         esc(link),
-        esc(f"Cuando lo abra y acepte, quedará en tu Círculo. Si alguien te escribe diciendo ser {name}, le preguntaré a {name} antes de que hagas algo."),
+        esc(f"Vence en {out['vence_en_horas']} horas y sirve una sola vez."),
+        f"{b('Validación:')} {esc(f'para aceptar, {name} tendrá que compartir su número')} {code(out['telefono'])} "
+        f"{esc('y después tú confirmarás que es tu familiar. Si alguien más abre el enlace, no podrá entrar.')}",
     ))
 
 
@@ -405,6 +435,7 @@ async def _circle_invitation(update: Update, context: ContextTypes.DEFAULT_TYPE,
         f"{esc('Hola,')} {b(update.effective_user.first_name or info['familiar'])}{esc('.')} "
         f"{b(info['protegido'])} {esc('te agregó a su')} {b('Círculo de Confianza')}{esc('.')}",
         esc("Si alguien le escribe diciendo ser tú, te preguntaré a ti antes de que haga algo. Tus datos se guardan protegidos (Ley 1581)."),
+        esc(f"Para confirmar que eres tú, te pediré tu número y {info['protegido']} confirmará que te conoce."),
         b("¿Aceptas?"),
     ), reply_markup=InlineKeyboardMarkup([[Btn("Sí, acepto", callback_data=f"acc:{token}:1"), Btn("No", callback_data=f"acc:{token}:0")]]))
 
@@ -576,6 +607,8 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await show_menu(update, context)
     elif data.startswith("acc:"):
         await _answer_invitation(update, context, data)
+    elif data.startswith("apr:"):
+        await _approve(update, context, data)
     elif data.startswith("resp:"):
         await _answer_question(update, context, data)
     elif not await _ensure_consent(update, context):
@@ -610,20 +643,81 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def _answer_invitation(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str) -> None:
     _, token, accepted = data.split(":")
+    await update.callback_query.edit_message_reply_markup(None)
+    if accepted == "1":  # first the number, shared with Telegram's button: only then the API hears of it
+        context.user_data["invitacion_token"] = token
+        await _reply(update, join(
+            f"{esc('Para confirmar que eres tú, toca')} {b('Compartir mi número')}{esc('.')}",
+            esc("Solo lo uso para esta validación y lo guardo protegido."),
+        ), reply_markup=ReplyKeyboardMarkup([[KeyboardButton("Compartir mi número", request_contact=True)]],
+                                            one_time_keyboard=True, resize_keyboard=True))
+        return
     try:
-        info = await _api(context).post("/bot/circulo/aceptar", json=_who(update) | {"token": token, "acepta": accepted == "1"})
+        info = await _api(context).post("/bot/circulo/aceptar", json=_who(update) | {"token": token, "acepta": False})
     except ApiError as error:
         await _api_error(update, context, error)
         return
-    context.user_data["consent"] = True
+    context.user_data.pop("invitacion", None)
+    await _reply(update, esc("Listo, no te agregué al Círculo."))
+    await _send(context, info["protegido_chat_id"], esc(f"{info['familiar']} no aceptó la invitación a tu Círculo."))
+
+
+async def _accept_invitation(update: Update, context: ContextTypes.DEFAULT_TYPE, token: str, phone: str) -> None:
+    try:
+        info = await _api(context).post("/bot/circulo/aceptar", json=_who(update) | {"token": token, "acepta": True, "telefono": phone})
+    except ApiError as error:
+        if error.status == 404:
+            await _reply(update, esc("Esa invitación ya se usó o venció (dura 48 horas). Pídele a tu familiar que te invite de nuevo."),
+                         reply_markup=ReplyKeyboardRemove())
+            return
+        await _api_error(update, context, error)
+        return
+    context.user_data.pop("invitacion", None)
+    protegido, familiar = info["protegido"], info["familiar"]
+    if info["estado"] == "por_aprobar":
+        context.user_data["consent"] = True
+        await _reply(update, esc(f"Gracias: tu número coincide. Le pedí a {protegido} que confirme que eres tú; te aviso apenas lo haga."),
+                     reply_markup=ReplyKeyboardRemove())
+        await _send(context, info["protegido_chat_id"], join(
+            f"🔐 {b('VALIDAR FAMILIAR')}",
+            f"{b(familiar)} {esc('aceptó tu invitación desde el número')} {code(info['telefono'])}{esc(', el mismo que me diste.')}",
+            b(f"¿Es de verdad {familiar}?"),
+        ), reply_markup=InlineKeyboardMarkup([[Btn(f"Sí, es {familiar}", callback_data=f"apr:{info['miembro_id']}:1"),
+                                               Btn("No lo conozco", callback_data=f"apr:{info['miembro_id']}:0")]]))
+    elif info["estado"] == "no_coincide":
+        await _reply(update, join(
+            f"🔴 {b('EL NÚMERO NO COINCIDE')}",
+            esc(f"Ese no es el número que {protegido} me dio para esta invitación, así que no te agregué."),
+            esc(f"Si es un error, pídele a {protegido} que te invite de nuevo con tu número."),
+        ), reply_markup=ReplyKeyboardRemove())
+        await _send(context, info["protegido_chat_id"], join(
+            f"⚠️ {b('INTENTO DE ENTRAR A TU CÍRCULO')}",
+            f"{esc('Alguien abrió tu invitación para')} {b(familiar)} {esc('con otro número')} {code(info['telefono'] or 'oculto')}{esc('.')}",
+            esc(f"No lo agregué. La invitación sigue esperando a {familiar}. Si no le enviaste el enlace a nadie más, puede ser un intento de estafa."),
+        ))
+    else:  # an invitation from before the validation by number
+        await _reply(update, esc(f"Esta invitación es anterior a la validación por número. Pídele a {protegido} que te invite de nuevo."),
+                     reply_markup=ReplyKeyboardRemove())
+
+
+async def _approve(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str) -> None:
+    _, miembro_id, accepted = data.split(":")
+    try:
+        info = await _api(context).post("/bot/circulo/aprobar", json=_who(update) | {"miembro_id": miembro_id, "aprueba": accepted == "1"})
+    except ApiError as error:
+        if error.status == 404:
+            await _reply(update, esc("Esa solicitud ya no está pendiente."))
+            return
+        await _api_error(update, context, error)
+        return
     await update.callback_query.edit_message_reply_markup(None)
-    protegido = (context.user_data.pop("invitacion", None) or {}).get("protegido", "tu familiar")
-    if info["acepta"]:
-        await _reply(update, esc(f"¡Gracias! Ya proteges a {protegido}."))
-        await _send(context, info["protegido_chat_id"], f"{b(info['familiar'])} {esc('aceptó: ya está en tu Círculo de Confianza.')}")
+    name = update.effective_user.first_name or "Tu familiar"
+    if info["aprueba"]:
+        await _reply(update, f"✅ {esc('Listo:')} {b(info['familiar'])} {esc('ya está en tu Círculo de Confianza, validado.')}")
+        await _send(context, info["familiar_chat_id"], f"✅ {b(name)} {esc('confirmó que eres tú: ya estás en su Círculo de Confianza.')}")
     else:
-        await _reply(update, esc("Listo, no te agregué al Círculo."))
-        await _send(context, info["protegido_chat_id"], esc(f"{info['familiar']} no aceptó la invitación a tu Círculo."))
+        await _reply(update, esc("Listo, no quedó en tu Círculo. Si alguien insiste en hacerse pasar por tu familiar, puede ser un intento de estafa."))
+        await _send(context, info["familiar_chat_id"], esc(f"{name} no confirmó la invitación, así que no quedaste en su Círculo."))
 
 
 async def _answer_question(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str) -> None:

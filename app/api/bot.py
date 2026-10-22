@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.analysis import describe_hit, normalize_value, run_analysis, text_from_audio, text_from_image
 from app.api.deps import session
 from app.core.ratelimit import RateLimiter, bot_user_limiter, report_limiter
-from app.core.security import require_bot
+from app.core.security import mask_value, normalize_phone, require_bot
 from app.db.models import Usuario
 from app.engine.juez import MODALIDADES, risk_level
 from app.engine.oficiales import line_to_call, official_websites
@@ -239,13 +239,24 @@ async def review(body: RevisionIn, db: AsyncSession = Depends(session)) -> dict:
 
 class InvitarIn(Persona):
     familiar: str = Field(..., min_length=2, max_length=60)
+    # The relative's number: whoever accepts must share this same one through Telegram.
+    telefono: str = Field(..., min_length=7, max_length=20)
     relacion: str | None = None
 
 
 @router.post("/circulo/invitar")
 async def invite(body: InvitarIn, db: AsyncSession = Depends(session)) -> dict:
     user = await _consented(db, body)
-    return {"token": await circulo.invite(db, user, body.familiar, body.relacion)}
+    try:
+        token = await circulo.invite(db, user, body.familiar, body.telefono, body.relacion)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"token": token, "telefono": _masked(body.telefono), "vence_en_horas": circulo.INVITE_HOURS}
+
+
+def _masked(raw: str | None) -> str | None:
+    phone = normalize_phone(raw or "")
+    return mask_value(phone, "telefono") if phone else None
 
 
 @router.get("/circulo/invitacion/{token}")
@@ -260,23 +271,47 @@ async def invitation(token: str, db: AsyncSession = Depends(session)) -> dict:
 class AceptarIn(Persona):
     token: str
     acepta: bool
+    # The number from Telegram's contact button (the bot checks it is the person's own).
+    telefono: str | None = None
 
 
 @router.post("/circulo/aceptar")
 async def accept(body: AceptarIn, db: AsyncSession = Depends(session)) -> dict:
     user = await _user(db, body)
-    usuarios.set_consent(user)  # accepting the Círculo is this person's consent
-    found = await circulo.accept(db, body.token, user, body.acepta)
+    found = await circulo.accept(db, body.token, user, body.acepta, body.telefono)
     if found is None:
-        raise HTTPException(status_code=404, detail="La invitación no existe o ya se usó.")
-    miembro, protegido = found
-    return {"protegido_chat_id": usuarios.chat_id_of(protegido), "familiar": miembro.nombre, "acepta": body.acepta}
+        raise HTTPException(status_code=404, detail="La invitación no existe, ya se usó o venció.")
+    estado, miembro, protegido = found
+    if estado == "por_aprobar":
+        usuarios.set_consent(user)  # accepting the Círculo is this person's consent
+    return {"estado": estado, "protegido_chat_id": usuarios.chat_id_of(protegido), "protegido": protegido.nombre_corto or "Tu familiar",
+            "familiar": miembro.nombre, "miembro_id": str(miembro.id), "telefono": _masked(body.telefono)}
+
+
+class AprobarIn(Persona):
+    miembro_id: str
+    aprueba: bool
+
+
+@router.post("/circulo/aprobar")
+async def approve(body: AprobarIn, db: AsyncSession = Depends(session)) -> dict:
+    """The protected person confirms that whoever accepted is really their relative."""
+    try:
+        miembro_id = UUID(body.miembro_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Esa solicitud ya no está pendiente.") from exc
+    found = await circulo.approve(db, await _user(db, body), miembro_id, body.aprueba)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Esa solicitud ya no está pendiente.")
+    miembro, familiar = found
+    return {"familiar": miembro.nombre, "familiar_chat_id": usuarios.chat_id_of(familiar), "aprueba": body.aprueba}
 
 
 @router.post("/circulo/ver")
 async def view_circle(persona: Persona, db: AsyncSession = Depends(session)) -> dict:
     user = await _user(db, persona)
-    return {"miembros": [m.nombre for m, _ in await circulo.members(db, user)], "pendientes": await circulo.pending_names(db, user)}
+    return {"miembros": [m.nombre for m, _ in await circulo.members(db, user)], "pendientes": await circulo.pending_names(db, user),
+            "por_aprobar": [{"id": str(m.id), "nombre": m.nombre} for m in await circulo.to_approve(db, user)]}
 
 
 class RespuestaIn(Persona):

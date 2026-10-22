@@ -174,12 +174,32 @@ def test_owner_can_ask_for_review(client):
 
 def test_circulo_de_confianza(client):
     mama = consenting(client, 500, "Rosa")
-    token = client.post("/api/v1/bot/circulo/invitar", json=mama | {"familiar": "Juan", "relacion": "hijo"}, headers=BOT).json()["token"]
+    invited = client.post("/api/v1/bot/circulo/invitar", json=mama | {"familiar": "Juan", "relacion": "hijo", "telefono": "310 500 0501"},
+                          headers=BOT).json()
+    token = invited["token"]
+    assert invited["telefono"] == "+57 310 ••• 0501" and invited["vence_en_horas"] == 48
     assert client.get(f"/api/v1/bot/circulo/invitacion/{token}", headers=BOT).json() == {"familiar": "Juan", "protegido": "Rosa"}
 
+    # Whoever got the link with another number cannot join; the invitation keeps waiting for Juan.
+    intruso = persona(502, "Intruso")
+    tried = client.post("/api/v1/bot/circulo/aceptar", json=intruso | {"token": token, "acepta": True, "telefono": "+57 300 999 0000"},
+                        headers=BOT).json()
+    assert tried["estado"] == "no_coincide" and tried["protegido_chat_id"] == 5000 and tried["telefono"] == "+57 300 ••• 0000"
+
     juan = persona(501, "Juan")
-    accepted = client.post("/api/v1/bot/circulo/aceptar", json=juan | {"token": token, "acepta": True}, headers=BOT).json()
-    assert accepted["protegido_chat_id"] == 5000
+    accepted = client.post("/api/v1/bot/circulo/aceptar", json=juan | {"token": token, "acepta": True, "telefono": "+573105000501"},
+                           headers=BOT).json()
+    assert accepted["estado"] == "por_aprobar" and accepted["protegido_chat_id"] == 5000
+    # The number matched, but Juan is not in the Círculo until Rosa says it is him; the link is spent.
+    seen = client.post("/api/v1/bot/circulo/ver", json=mama, headers=BOT).json()
+    assert seen["miembros"] == [] and seen["por_aprobar"] == [{"id": accepted["miembro_id"], "nombre": "Juan"}]
+    assert client.post("/api/v1/bot/circulo/aceptar", json=intruso | {"token": token, "acepta": True, "telefono": "3105000501"},
+                       headers=BOT).status_code == 404
+    # Only Rosa can approve her own Círculo.
+    approval = {"miembro_id": accepted["miembro_id"], "aprueba": True}
+    assert client.post("/api/v1/bot/circulo/aprobar", json=intruso | approval, headers=BOT).status_code == 404
+    approved = client.post("/api/v1/bot/circulo/aprobar", json=mama | approval, headers=BOT).json()
+    assert approved == {"familiar": "Juan", "familiar_chat_id": 5010, "aprueba": True}
     assert client.post("/api/v1/bot/circulo/ver", json=mama, headers=BOT).json()["miembros"] == ["Juan"]
 
     with fake_ai("falso_familiar", "dinero", True):
@@ -192,6 +212,39 @@ def test_circulo_de_confianza(client):
     answer = client.post("/api/v1/bot/circulo/responder", headers=BOT, json=juan | {"aviso_id": question["aviso_id"], "respuesta": "no"}).json()
     assert answer["protegido_chat_id"] == 5000 and answer["respuesta"] == "no"
     assert client.post("/api/v1/bot/circulo/expirar", json={"aviso_id": question["aviso_id"]}, headers=BOT).json()["expirado"] is False
+
+
+def test_an_invitation_needs_a_valid_number_that_is_not_ones_own(client):
+    rosa = consenting(client, 510, "Rosa")
+    client.post("/api/v1/bot/telefono", json=rosa | {"telefono": "311 510 0000"}, headers=BOT)
+    own = client.post("/api/v1/bot/circulo/invitar", json=rosa | {"familiar": "Ana", "telefono": "3115100000"}, headers=BOT)
+    assert own.status_code == 422 and "propio" in own.json()["detail"]
+    assert client.post("/api/v1/bot/circulo/invitar", json=rosa | {"familiar": "Ana", "telefono": "1234567"}, headers=BOT).status_code == 422
+    assert client.post("/api/v1/bot/circulo/invitar", json=rosa | {"familiar": "Ana"}, headers=BOT).status_code == 422
+
+
+def test_an_invitation_lasts_48_hours(client):
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    from app.db.database import SessionLocal
+    from app.db.models import MiembroCirculo, utcnow
+
+    rosa = consenting(client, 520, "Rosa")
+    token = client.post("/api/v1/bot/circulo/invitar", json=rosa | {"familiar": "Ana", "telefono": "312 520 0001"}, headers=BOT).json()["token"]
+
+    async def age():
+        async with SessionLocal() as db:
+            await db.execute(update(MiembroCirculo).where(MiembroCirculo.nombre == "Ana").values(creado_at=utcnow() - timedelta(hours=49)))
+            await db.commit()
+
+    client.portal.call(age)  # on the client's own event loop, where the database pool lives
+    assert client.get(f"/api/v1/bot/circulo/invitacion/{token}", headers=BOT).status_code == 404
+    ana = persona(521, "Ana")
+    assert client.post("/api/v1/bot/circulo/aceptar", json=ana | {"token": token, "acepta": True, "telefono": "3125200001"},
+                       headers=BOT).status_code == 404
+    assert client.post("/api/v1/bot/circulo/ver", json=rosa, headers=BOT).json()["pendientes"] == []
 
 
 def test_dashboard_views(client):

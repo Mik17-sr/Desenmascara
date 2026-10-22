@@ -289,3 +289,69 @@ def test_relative_says_no_and_the_circle_is_alerted():
     asyncio.run(handlers._answer_question(update, context, "resp:a1:no"))
     sent = {call.args[0]: call.args[1] for call in context.bot.send_message.call_args_list}
     assert "ES UNA ESTAFA" in sent[10] and "ALERTA DE TU CÍRCULO" in sent[77]
+
+
+# --- Validating the relative who accepts a Círculo invitation -----------------------------------
+
+def test_adding_a_relative_asks_for_their_number():
+    api = FakeApi({"/bot/circulo/invitar": lambda body: {"token": "tok", "telefono": "+57 310 ••• 4567", "vence_en_horas": 48}})
+    update, context = fake("Rosa", api)
+    context.user_data["modo"] = "circulo_nombre"
+    asyncio.run(handlers.on_text(update, context))
+    assert "número de celular de *Rosa*" in replies(update)[0] and context.user_data["modo"] == "circulo_telefono"
+    update.effective_message.text = "310 123 4567"
+    asyncio.run(handlers.on_text(update, context))
+    assert api.calls[-1] == ("/bot/circulo/invitar", {"telegram_id": 1, "chat_id": 10, "nombre": "Rosa", "familiar": "Rosa", "telefono": "310 123 4567"})
+    message = replies(update)[-1]
+    assert "start\\=c\\_tok" in message and "Vence en 48 horas" in message and "`+57 310 ••• 4567`" in message
+    assert context.user_data["modo"] is None
+
+
+def contact_update(api, phone="+57 310 123 4567"):
+    update, context = fake(None, api, contact=SimpleNamespace(user_id=1, phone_number=phone))
+    context.user_data["invitacion_token"] = "tok"
+    return update, context
+
+
+def test_the_relative_shares_their_number_and_the_protected_person_confirms():
+    api = FakeApi({"/bot/circulo/aceptar": {"estado": "por_aprobar", "protegido_chat_id": 77, "protegido": "Mike", "familiar": "Rosa",
+                                            "miembro_id": "m1", "telefono": "+57 310 ••• 4567"}})
+    update, context = contact_update(api)
+    asyncio.run(handlers.on_contact(update, context))
+    assert api.calls == [("/bot/circulo/aceptar", {"telegram_id": 1, "chat_id": 10, "nombre": "Rosa", "token": "tok", "acepta": True,
+                                                   "telefono": "+57 310 123 4567"})]
+    assert "tu número coincide" in replies(update)[0]
+    sent = context.bot.send_message.call_args
+    assert sent.args[0] == 77 and "VALIDAR FAMILIAR" in sent.args[1] and "`+57 310 ••• 4567`" in sent.args[1]
+    buttons = [b.callback_data for b in sent.kwargs["reply_markup"].inline_keyboard[0]]
+    assert buttons == ["apr:m1:1", "apr:m1:0"]
+
+
+def test_another_number_is_turned_away_and_the_protected_person_warned():
+    api = FakeApi({"/bot/circulo/aceptar": {"estado": "no_coincide", "protegido_chat_id": 77, "protegido": "Mike", "familiar": "Rosa",
+                                            "miembro_id": "m1", "telefono": "+57 300 ••• 0000"}})
+    update, context = contact_update(api, "+57 300 999 0000")
+    asyncio.run(handlers.on_contact(update, context))
+    assert "EL NÚMERO NO COINCIDE" in replies(update)[0]
+    warning = context.bot.send_message.call_args.args
+    assert warning[0] == 77 and "INTENTO DE ENTRAR" in warning[1] and "`+57 300 ••• 0000`" in warning[1]
+
+
+def test_the_protected_person_approves():
+    api = FakeApi({"/bot/circulo/aprobar": {"familiar": "Rosa", "familiar_chat_id": 55, "aprueba": True}})
+    update, context = fake(None, api)
+    update.callback_query = SimpleNamespace(data="apr:m1:1", answer=AsyncMock(), edit_message_reply_markup=AsyncMock())
+    asyncio.run(handlers.on_button(update, context))
+    assert api.calls[-1] == ("/bot/circulo/aprobar", {"telegram_id": 1, "chat_id": 10, "nombre": "Rosa", "miembro_id": "m1", "aprueba": True})
+    assert "ya está en tu Círculo de Confianza, validado" in replies(update)[0]
+    assert context.bot.send_message.call_args.args[0] == 55
+
+
+def test_accepting_asks_for_the_number_first():
+    api = FakeApi({})
+    update, context = fake(None, api)
+    update.callback_query = SimpleNamespace(data="acc:tok:1", answer=AsyncMock(), edit_message_reply_markup=AsyncMock())
+    asyncio.run(handlers.on_button(update, context))
+    assert api.calls == [] and context.user_data["invitacion_token"] == "tok"
+    keyboard = update.effective_message.reply_text.call_args.kwargs["reply_markup"].keyboard[0][0]
+    assert keyboard.text == "Compartir mi número" and keyboard.request_contact

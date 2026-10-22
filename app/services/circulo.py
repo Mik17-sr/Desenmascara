@@ -2,10 +2,16 @@
 
 On Telegram a bot cannot write first, so the protected person sends the relative an invite
 link; opening it is the relative's consent and lets the bot write to them later.
+
+Validating the relative, so that a forwarded or stolen link is not enough to join:
+1. the protected person gives the relative's number with the invitation (the link lasts 48 h, once);
+2. whoever accepts shares their own number through Telegram's button, and it must be that one;
+3. the protected person confirms "¿es tu familiar?"; only then is the relative in the Círculo.
 """
 
 import re
 import secrets
+from datetime import timedelta
 from uuid import UUID
 
 from sqlalchemy import delete, select
@@ -13,7 +19,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import AvisoCirculo, Circulo, MiembroCirculo, Usuario, utcnow
 from app.engine.pistas import plain
-from app.services.usuarios import value_fingerprint
+from app.core.security import normalize_phone
+from app.services.usuarios import set_phone, value_fingerprint
+
+INVITE_HOURS = 48
 
 
 async def own_circle(session: AsyncSession, protegido: Usuario) -> Circulo | None:
@@ -23,7 +32,14 @@ async def own_circle(session: AsyncSession, protegido: Usuario) -> Circulo | Non
     )
 
 
-async def invite(session: AsyncSession, protegido: Usuario, nombre: str, relacion: str | None = None) -> str:
+async def invite(session: AsyncSession, protegido: Usuario, nombre: str, telefono: str, relacion: str | None = None) -> str:
+    """ValueError when the number is not valid or is the protected person's own."""
+    phone = normalize_phone(telefono)
+    if phone is None:
+        raise ValueError("No reconocí ese número.")
+    phone_hash = value_fingerprint("telefono", phone)
+    if phone_hash == protegido.telefono_hash:
+        raise ValueError("Ese es tu propio número: escribe el de tu familiar.")
     circulo = await own_circle(session, protegido)
     if circulo is None:
         circulo = Circulo(nombre=f"Círculo de {protegido.nombre_corto or 'mi familia'}")
@@ -33,14 +49,19 @@ async def invite(session: AsyncSession, protegido: Usuario, nombre: str, relacio
                                    nombre=protegido.nombre_corto or "Protegido", acepto_at=utcnow()))
     token = secrets.token_urlsafe(12)
     session.add(MiembroCirculo(circulo_id=circulo.id, rol="familiar", nombre=nombre.strip()[:60], relacion=relacion,
-                               invitacion_hash=value_fingerprint("invitacion", token)))
+                               invitacion_hash=value_fingerprint("invitacion", token), telefono_hash=phone_hash))
     await session.flush()
     return token
 
 
+def _expired(miembro: MiembroCirculo) -> bool:
+    return miembro.creado_at < utcnow() - timedelta(hours=INVITE_HOURS)
+
+
 async def pending_invite(session: AsyncSession, token: str) -> tuple[MiembroCirculo, Usuario] | None:
+    """None when the link does not exist, was used or is older than 48 hours."""
     miembro = await session.scalar(select(MiembroCirculo).where(MiembroCirculo.invitacion_hash == value_fingerprint("invitacion", token)))
-    if miembro is None:
+    if miembro is None or _expired(miembro):
         return None
     protegido = await session.scalar(
         select(Usuario).join(MiembroCirculo, MiembroCirculo.usuario_id == Usuario.id)
@@ -49,18 +70,43 @@ async def pending_invite(session: AsyncSession, token: str) -> tuple[MiembroCirc
     return miembro, protegido
 
 
-async def accept(session: AsyncSession, token: str, familiar: Usuario, acepta: bool) -> tuple[MiembroCirculo, Usuario] | None:
+async def accept(session: AsyncSession, token: str, familiar: Usuario, acepta: bool,
+                 telefono: str | None = None) -> tuple[str, MiembroCirculo, Usuario] | None:
+    """(estado, member, protected person). estado: rechazada, por_aprobar (the number matched: the protected person
+    confirms next), no_coincide (another number: the link keeps waiting for the real relative) or sin_numero (an
+    invitation from before the validation). The number is the one Telegram's contact button gave the bot."""
     found = await pending_invite(session, token)
     if found is None or found[1].id == familiar.id:
         return None
     miembro, protegido = found
-    if acepta:
-        miembro.usuario_id = familiar.id
+    if not acepta:
+        await session.delete(miembro)
+        return "rechazada", miembro, protegido
+    if miembro.telefono_hash is None:
+        return "sin_numero", miembro, protegido
+    phone = normalize_phone(telefono or "")
+    if phone is None or value_fingerprint("telefono", phone) != miembro.telefono_hash:
+        return "no_coincide", miembro, protegido
+    await set_phone(session, familiar, phone)
+    miembro.usuario_id = familiar.id
+    miembro.invitacion_hash = None  # one use
+    return "por_aprobar", miembro, protegido
+
+
+async def approve(session: AsyncSession, protegido: Usuario, miembro_id: UUID, aprueba: bool) -> tuple[MiembroCirculo, Usuario] | None:
+    """The protected person's answer to "¿es tu familiar?". None unless it is their own Círculo and the relative is
+    waiting for it."""
+    miembro = await session.get(MiembroCirculo, miembro_id)
+    circulo = await own_circle(session, protegido)
+    if miembro is None or circulo is None or miembro.circulo_id != circulo.id or miembro.rol != "familiar" \
+            or miembro.usuario_id is None or miembro.acepto_at is not None:
+        return None
+    familiar = await session.get(Usuario, miembro.usuario_id)
+    if aprueba:
         miembro.acepto_at = utcnow()
-        miembro.invitacion_hash = None
     else:
         await session.delete(miembro)
-    return miembro, protegido
+    return miembro, familiar
 
 
 async def members(session: AsyncSession, protegido: Usuario) -> list[tuple[MiembroCirculo, Usuario]]:
@@ -78,9 +124,19 @@ async def pending_names(session: AsyncSession, protegido: Usuario) -> list[str]:
     circulo = await own_circle(session, protegido)
     if circulo is None:
         return []
-    return list(await session.scalars(
-        select(MiembroCirculo.nombre).where(MiembroCirculo.circulo_id == circulo.id, MiembroCirculo.acepto_at.is_(None))
-    ))
+    invited = await session.scalars(select(MiembroCirculo).where(
+        MiembroCirculo.circulo_id == circulo.id, MiembroCirculo.usuario_id.is_(None), MiembroCirculo.acepto_at.is_(None)))
+    return [m.nombre for m in invited if not _expired(m)]
+
+
+async def to_approve(session: AsyncSession, protegido: Usuario) -> list[MiembroCirculo]:
+    """Relatives whose number matched and who wait for the protected person's "sí"."""
+    circulo = await own_circle(session, protegido)
+    if circulo is None:
+        return []
+    return list(await session.scalars(select(MiembroCirculo).where(
+        MiembroCirculo.circulo_id == circulo.id, MiembroCirculo.rol == "familiar", MiembroCirculo.usuario_id.is_not(None),
+        MiembroCirculo.acepto_at.is_(None))))
 
 
 def mentioned(text: str, candidates: list[tuple[MiembroCirculo, Usuario]]) -> list[tuple[MiembroCirculo, Usuario]]:

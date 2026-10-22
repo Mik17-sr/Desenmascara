@@ -291,7 +291,7 @@ python scripts/crear_entidad.py "Nombre de la entidad" --correo panel@entidad.co
 ## 14. Pasar a Supabase (RLS y Realtime)
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En **SQL Editor**, pega y ejecuta en orden `supabase/migrations/20261021120000_esquema_inicial.sql` y `supabase/migrations/20261022120000_accesos_entidad.sql` (o `supabase db push` con la CLI). Crean las tablas con RLS, las 5 vistas anónimas y la tabla `eventos_dashboard`, que ya queda publicada en Realtime.
+2. En **SQL Editor**, pega y ejecuta en orden `supabase/migrations/20261021120000_esquema_inicial.sql`, `supabase/migrations/20261022120000_accesos_entidad.sql` y `supabase/migrations/20261022160000_validar_familiar.sql` (o `supabase db push` con la CLI). Crean las tablas con RLS, las 5 vistas anónimas y la tabla `eventos_dashboard`, que ya queda publicada en Realtime.
 3. En **Project Settings → Database → Connection string**, copia la de **Session pooler** (funciona con IPv4) y ponla en `.env`:
    `DATABASE_URL=postgresql://postgres.<proyecto>:<contraseña>@aws-0-<región>.pooler.supabase.com:5432/postgres`
 4. Copia tus datos locales (opcional): `python scripts/migrar_a_supabase.py`. Usa los mismos `HMAC_SECRET` y `ENCRYPTION_KEY`.
@@ -358,7 +358,7 @@ El modelo de 1B es más rápido, pero deja pasar 9 de las 14 estafas: nos quedam
 
 ## 17. Qué funciona y qué falta
 
-Funciona: el bot con mensajes, capturas, números y notas de voz; Llamada Verificada con BancoAndino (ficticio); Círculo de Confianza con invitaciones; Banco de números con lista blanca y revisiones; Antes de pagar; el Dashboard con sus 4 vistas.
+Funciona: el bot con mensajes, capturas, números y notas de voz; Llamada Verificada con BancoAndino (ficticio); Círculo de Confianza con invitaciones validadas (el familiar comparte el mismo número que dio el protegido, y el protegido confirma que es él; el enlace dura 48 horas y sirve una vez); Banco de números con lista blanca y revisiones; Antes de pagar; el Dashboard con sus 4 vistas.
 
 Falta o es visión: WhatsApp (Twilio); los 4 casos reales del equipo y el dataset real; escaneos de seguridad en CI; entidades reales conectadas. El despliegue en Render ya está listo en `render.yaml` (sección 18).
 

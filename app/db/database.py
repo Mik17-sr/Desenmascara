@@ -55,10 +55,28 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         if IS_SQLITE:
             await conn.run_sync(Base.metadata.create_all)
+            # create_all never touches a table that exists: a column added in a later version is added here.
+            for table, column in await conn.run_sync(_missing_columns):
+                await conn.execute(text(f"alter table {table.name} add column {column.name} {column.type.compile(engine.dialect)}"))
             return
         missing = [t for t in Base.metadata.tables if (await conn.execute(text("select to_regclass(:t)"), {"t": t})).scalar() is None]
+        if not missing:
+            missing = [f"{table.name}.{column.name}" for table, column in await conn.run_sync(_missing_columns)]
     if missing:
-        raise RuntimeError(f"Faltan tablas en la base de datos ({', '.join(missing)}). Aplica {MIGRATION} en Supabase.")
+        raise RuntimeError(f"Faltan tablas o columnas en la base de datos ({', '.join(missing)}). Aplica {MIGRATION} en Supabase.")
+
+
+def _missing_columns(sync_conn):
+    from sqlalchemy import inspect
+
+    from app.db.models import Base
+
+    inspector = inspect(sync_conn)
+    found = []
+    for table in Base.metadata.sorted_tables:
+        existing = {c["name"] for c in inspector.get_columns(table.name)}
+        found += [(table, column) for column in table.columns if column.name not in existing and column.nullable]
+    return found
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

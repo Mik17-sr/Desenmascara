@@ -54,6 +54,9 @@ class MiembroCirculo(Base):
     nombre: Mapped[str] = mapped_column(String(60))
     relacion: Mapped[str | None] = mapped_column(String(40))
     invitacion_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
+    # Fingerprint of the number the protected person gave for this relative: whoever accepts must share that same
+    # number through Telegram, and then the protected person confirms it (app/services/circulo.py).
+    telefono_hash: Mapped[str | None] = mapped_column(String(64))
     acepto_at: Mapped[datetime | None] = mapped_column(DateTime)
     creado_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
