@@ -14,6 +14,7 @@ const TABS = [
   { href: "/", label: "Radar", short: "Radar" },
   { href: "/verificar", label: "Verificar un mensaje", short: "Verificar" },
   { href: "/banco", label: "Banco de números", short: "Banco de números" },
+  { href: "/pitch", label: "Pitch", short: "Pitch" },
 ];
 const ENTIDAD = { href: "/entidad", label: "Acceso para entidades", short: "Entidades" };
 

@@ -15,7 +15,7 @@ from app.db.models import Campana, Verificacion, utcnow
 from app.engine import archivista
 from app.engine.enlaces import registered_domain
 from app.engine.juez import MODALIDADES, CampaignHit
-from app.engine.pistas import CUENTA_PATTERN, PHONE_PATTERN, Pistas
+from app.engine.pistas import CUENTA_PATTERN, KNOWN_NAMES, PHONE_PATTERN, Pistas, brands_named, plain, squash
 from app.schemas.contract import AnalysisResult, LinkStatus, RiskLevel
 from app.services import banco
 
@@ -32,6 +32,58 @@ NAME_AFTER = re.compile(r"(?i)\b(soy|me llamo|habla|le habla|mi nombre es)\s+([A
 # Long digit runs (IDs, accounts) go; an amount after "$" stays: it is not personal, and the Dashboard adds up
 # what scams ask for.
 LONG_NUMBER = re.compile(r"(?<!\$)(?<!\$ )\b\d[\d .-]{5,}\d\b")
+# "Sr(a) JUAN PÉREZ, su obligación…", "Hola, María": the name after a greeting or a title.
+GREETING_NAME = re.compile(
+    r"(?i:\b(hola|estimad[oa]|apreciad[oa]|querid[oa]|señor(?:a|\(a\))?|senor(?:a|\(a\))?|sr(?:a|\(a\))?|srta|don|doña)\b\.?)([\s,]+)"
+    r"((?:[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:[ \t]+|\b)){1,4})")
+# Collection SMS read from a screenshot glue names in capitals: "MIGUELANGELGONZALEZ BERNAL". Two or more words in
+# capitals in a row, or one glued word of 12+ letters, are taken as a name unless they are common words or a brand
+# (the early warning for entities reads the brands from this text).
+CAPS_RUN = re.compile(r"\b[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*\b")  # \s: the OCR breaks lines between words
+KINSHIP = {"mama", "mami", "mamita", "papa", "papi", "hijo", "hija", "abuela", "abuelo", "abuelita", "tia", "tio", "amigo", "amiga",
+           "cliente", "usuario", "usuaria", "senor", "senora", "familia", "prima", "primo", "dias", "tardes", "noches"}
+COMMON_CAPS = set("""
+a al ante con de del desde el en entre es esta este hasta la las le lo los mas mi mis no o para pero por que se si sin su sus
+te tu tus un una uno y ya hoy ahora aqui solo muy bien gracias atencion aviso ultimo ultima urgente importante alerta oferta
+descuento gratis premio ganador ganaste felicidades cuenta cuentas pago pague paga pagar deuda deudas saldo mora cobro juridico
+obligacion credito tarjeta banco clave codigo referencia valor total sms whatsapp llama llame llamenos escriba escribe
+responda ingrese ingresa link enlace click clic aqui bloqueo bloqueada bloqueado suspendida suspendido cancelada activa
+activar validar valide actualice confirme datos cedula nit numero linea servicio cliente usuario estimado senor senora sr sra
+colombia bogota peso pesos cop am pm dian simit sena eps nueva nuevo paz salvo acuerdo propuesta plazo vence vencida
+""".split())
+BRANDS = {squash(name) for name in KNOWN_NAMES}
+
+
+def _is_brand(word: str) -> bool:
+    flat = squash(word)
+    return any(brand in flat or (flat in brand and len(flat) >= 4) for brand in BRANDS)
+
+
+def _caps_names(match: re.Match) -> str:
+    parts = re.split(r"(\s+)", match.group(0))  # words and the spaces or line breaks between them, kept as they were
+    words, gaps = parts[0::2], parts[1::2] + [""]
+    keep = [plain(w) in COMMON_CAPS or _is_brand(w) for w in words]
+    out, i = [], 0
+    while i < len(words):
+        if keep[i]:
+            out += [words[i], gaps[i]]
+            i += 1
+            continue
+        j = i
+        while j < len(words) and not keep[j]:
+            j += 1
+        run = words[i:j]  # a name: two or more unknown words in capitals, or one glued word of 12+ letters
+        out += ["[nombre]", gaps[j - 1]] if len(run) >= 2 or len(run[0]) >= 12 else [x for k in range(i, j) for x in (words[k], gaps[k])]
+        i = j
+    return "".join(out)
+
+
+def _greeting_name(match: re.Match) -> str:
+    words = match.group(3).split()
+    if plain(words[0]) in KINSHIP or _is_brand(words[0]):
+        return match.group(0)
+    tail = " " if match.group(3)[-1:].isspace() else ""
+    return f"{match.group(1)}{match.group(2)}[nombre]{tail}"
 
 
 def anonymize(text: str) -> str:
@@ -40,6 +92,8 @@ def anonymize(text: str) -> str:
     text = PHONE_PATTERN.sub("[número]", text)
     text = CUENTA_PATTERN.sub(lambda m: m.group(0).replace(m.group(1), "[cuenta]"), text)
     text = LONG_NUMBER.sub("[número]", text)
+    text = GREETING_NAME.sub(_greeting_name, text)
+    text = CAPS_RUN.sub(_caps_names, text)
     return NAME_AFTER.sub(lambda m: f"{m.group(1)} [nombre]", text)[:2000]
 
 
@@ -94,11 +148,15 @@ async def best_campaign(session: AsyncSession, huella: list[int] | None) -> Camp
     return CampaignHit(id=campaign_id, nombre=nombre, similitud=matches[0][1], reportes_hoy=max(1, reportes_hoy))
 
 
-def _campaign_name(pistas: Pistas, modalidad: str | None, text: str) -> str:
-    who = pistas.entidades[0] if pistas.entidades else MODALIDADES.get(modalidad or "", ("Campaña",))[0]
-    words = re.findall(r"[\wáéíóúñÁÉÍÓÚÑ$.]+", anonymize(text))
-    snippet = " ".join(w for w in words if w.lower() not in who.lower())[:48].strip()
-    return f"Falso {who} · «{snippet}…»" if pistas.entidades else f"{who} · «{snippet}…»"
+def campaign_name(modalidad: str | None, text: str) -> str:
+    """«Posible cobranza falsa · Credivalores, SystemGroup»: the modalidad and the brands it uses. A screenshot starts
+    with the phone's status bar, so a snippet of the text is only the last resort."""
+    category = MODALIDADES.get(modalidad or "", ("Posible estafa",))[0]
+    brands = brands_named(text)
+    if brands:
+        return f"{category} · {', '.join(brands[:2])}"
+    sentences = [x.strip() for x in re.split(r"[.!?\n]+", anonymize(text)) if len(re.findall(r"[a-záéíóúñ]{4,}", x)) >= 4]
+    return f"{category} · «{sentences[0][:48].strip()}…»" if sentences else category
 
 
 async def save(verificacion_id: UUID, *, usuario_id: UUID | None, canal: str, tipo: str, text: str, result: AnalysisResult,
@@ -125,7 +183,7 @@ async def _save(session: AsyncSession, verificacion_id: UUID, *, usuario_id, can
         if joined:
             campana = await session.get(Campana, joined)
         elif matches and result.risk_level == RiskLevel.HIGH:
-            campana = Campana(nombre=_campaign_name(pistas, result.modalidad, text), modalidad=result.modalidad,
+            campana = Campana(nombre=campaign_name(result.modalidad, text), modalidad=result.modalidad,
                               centroide=huella, total_reportes=len(matches))
             session.add(campana)
             await session.flush()
