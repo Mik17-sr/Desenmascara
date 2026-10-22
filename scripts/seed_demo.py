@@ -4,7 +4,8 @@
     python scripts/seed_demo.py --nueva-llave   # rotates BancoAndino's key
 
 Reported numbers come from demo users named "Demo N", so the Banco de números and the
-Dashboard are not empty during the demo. Tell the jury these are test data.
+Dashboard are not empty during the demo. Tell the jury these are test data, and remove them
+with scripts/limpiar_datos.py before showing the system to a company.
 """
 
 import asyncio
@@ -15,12 +16,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import select  # noqa: E402
 
-from app.core.config import settings  # noqa: E402
 from app.core.security import encrypt, hash_api_key, new_api_key  # noqa: E402
 from app.db.database import SessionLocal, init_db  # noqa: E402
 from app.db.models import Usuario  # noqa: E402
-from app.services import banco, entidades  # noqa: E402
-from app.services.usuarios import value_fingerprint  # noqa: E402
+from app.services import banco, demo, entidades  # noqa: E402
+from app.services.entidades import panel_link  # noqa: E402
 
 ENTIDADES = [
     ("BancoAndino", "banco", "bancoandino.com", ["+57 601 000 0002"], "576010000002"),
@@ -36,17 +36,12 @@ REPORTADOS = [
 ]
 
 
-def panel_link(key: str) -> str:
-    """Opens the entity panel already signed in. The key goes after '#', so it never reaches a server."""
-    return f"{settings.DASHBOARD_ORIGINS.split(',')[0].strip()}/entidad#llave={key}"
-
 
 async def main(rotate: bool) -> None:
     await init_db()
     async with SessionLocal() as db:
         demo_users = []
-        for i in range(1, 31):
-            telegram_hash = value_fingerprint("telegram", f"demo-{i}")
+        for i, telegram_hash in enumerate(demo.user_fingerprints(), 1):
             user = await db.scalar(select(Usuario).where(Usuario.telegram_hash == telegram_hash))
             if user is None:
                 user = Usuario(telegram_hash=telegram_hash, chat_cifrado=encrypt("0"), nombre_corto=f"Demo {i}")
@@ -76,6 +71,7 @@ async def main(rotate: bool) -> None:
             await banco.recompute(db, indicador)
         await db.commit()
     print("Datos de prueba listos. Son ficticios: díselo así al jurado.")
+    print("Antes de mostrarlo a una empresa: python scripts/limpiar_datos.py")
 
 
 if __name__ == "__main__":

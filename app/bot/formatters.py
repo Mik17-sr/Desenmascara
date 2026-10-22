@@ -96,6 +96,19 @@ def format_call(info: dict) -> str:
     )
 
 
+def format_not_connected(info: dict) -> str:
+    """A real entity that has not joined Llamada Verificada: we cannot know, so we never say it is false."""
+    entidad = info["entidad"]
+    donde = f"en tu tarjeta o en {info['sitio']}" if info.get("sitio") else "en tu tarjeta"
+    return join(
+        f"🟡 {b('NO PUEDO CONFIRMARLO')}",
+        f"{b(entidad)} {esc('todavía no está conectada a Llamada Verificada, así que no sé si de verdad es ella.')}",
+        f"{b('Qué hacer:')} {esc(f'cuelga y llama tú a la línea que aparece {donde}.')}",
+        esc("Nunca dictes claves ni códigos por teléfono, aunque digan ser del banco."),
+        esc("¿Te llamaron de un número que no conoces? Envíamelo y lo reviso en el Banco de números."),
+    )
+
+
 def format_code(info: dict) -> str:
     if info["estado"] == "correcto":
         return join(

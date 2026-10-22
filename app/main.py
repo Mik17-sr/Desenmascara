@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.db.database import SessionLocal, init_db
 from app.engine.analyzer import warm_up
 from app.engine.traductor import warm_up_models
-from app.services import llamadas
+from app.services import demo, llamadas
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +69,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 @app.get("/health", tags=["Health"])
 async def health_check():
     database = ai = "ok"
+    with_demo = False
     try:
         async with SessionLocal() as db:
             await db.execute(text("SELECT 1"))
+            with_demo = await demo.present(db)
     except Exception:
         database = "no disponible"
     try:
@@ -85,6 +87,7 @@ async def health_check():
         "version": settings.VERSION,
         "base_de_datos": database,
         "ia": ai,
+        "demo": with_demo,  # the Dashboard says "Datos de demostración" only while seed_demo.py's data is loaded
     }
 
 @app.get("/", include_in_schema=False)

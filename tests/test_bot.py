@@ -5,7 +5,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.bot import client, handlers, textos
-from app.bot.formatters import format_analysis, format_call, format_code, format_heard, format_number, format_report
+from app.bot.formatters import (
+    format_analysis, format_call, format_code, format_heard, format_not_connected, format_number, format_report,
+)
 from app.schemas.contract import AnalysisResult, SignalItem, SignalSource
 
 # MarkdownV2 reserved characters, except "*" and "_", which the formatters use as markup.
@@ -52,6 +54,7 @@ SIGNAL = SignalItem(code="ENLACE_IMITA_OFICIAL", label="El enlace no es la pági
     format_call({"estado": "real", "entidad": "BancoAndino", "motivo": "Confirmar una compra.", "codigo": "4821"}),
     format_call({"estado": "no_registrada", "entidad": "BancoAndino", "lineas_oficiales": ["+57 601 000 0002"]}),
     format_code({"estado": "correcto", "entidad": "BancoAndino"}),
+    format_not_connected({"estado": "no_conectada", "entidad": "Bancolombia", "sitio": "bancolombia.com"}),
     format_code({"estado": "incorrecto"}),
     format_number({"encontrado": True, "valor": "+57 601 ••• 0000", "nivel": 90, "personas": 29, "reportes": 37,
                    "modalidad": "Falso asesor del banco", "estado": "normal", "oficial_de": None}),
@@ -77,6 +80,11 @@ def test_counts_of_one_read_well():
     assert "*1 reporte* de 1 persona\\." in number
     assert "*1 persona* que lo reportó\\." in format_report({"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 1})
     assert "*3 personas* que lo reportaron\\." in format_report({"nuevo": True, "valor": "+57 320 ••• 1234", "personas": 3})
+
+
+def test_a_bank_that_has_not_joined_is_never_called_false():
+    message = format_not_connected({"estado": "no_conectada", "entidad": "Bancolombia", "sitio": "bancolombia.com"})
+    assert message.startswith("🟡 *NO PUEDO CONFIRMARLO*") and "bancolombia\.com" in message and "NO ES TU BANCO" not in message
 
 
 def test_verified_call_code_is_in_a_box():

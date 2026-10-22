@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import hash_api_key, new_api_key
 from app.db.models import Entidad
 from app.engine.pistas import plain
@@ -38,3 +39,8 @@ async def create(session: AsyncSession, nombre: str, tipo: str, dominio: str | N
     session.add(entidad)
     await session.flush()
     return entidad, key
+
+
+def panel_link(key: str) -> str:
+    """Opens the entity panel already signed in. The key goes after '#', so it never reaches a server."""
+    return f"{settings.DASHBOARD_ORIGINS.split(',')[0].strip()}/entidad#llave={key}"

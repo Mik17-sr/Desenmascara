@@ -14,6 +14,12 @@ from app.services import banco, entidades
 router = APIRouter(dependencies=[Depends(require_admin)])
 
 
+@router.get("/equipo/yo")
+async def whoami() -> dict:
+    """Lets the Dashboard check the team key before it shows the moderation tools."""
+    return {"equipo": True}
+
+
 class EntidadIn(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=80)
     tipo: str = Field("banco", pattern=r"^(banco|tienda|operador|publica)$")

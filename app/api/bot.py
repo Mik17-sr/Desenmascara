@@ -17,7 +17,8 @@ from app.core.ratelimit import bot_user_limiter
 from app.core.security import require_bot
 from app.db.models import Usuario
 from app.engine.juez import MODALIDADES, risk_level
-from app.engine.pistas import Pistas
+from app.engine.oficiales import official_websites
+from app.engine.pistas import Pistas, extract
 from app.schemas.contract import AnalysisInput, AnalysisResult, RiskLevel, SignalItem, SignalSource
 from app.services import banco, circulo, entidades, llamadas, usuarios, verificaciones
 
@@ -156,7 +157,12 @@ async def verified_call(body: LlamadaIn, background_tasks: BackgroundTasks, db: 
     user = await _consented(db, body)
     entidad = await entidades.find_in_text(db, body.texto)
     if entidad is None:
-        return {"estado": "entidad_desconocida", "entidades": [e.nombre for e in await entidades.active(db) if e.tipo != "tienda"]}
+        connected = [e.nombre for e in await entidades.active(db) if e.tipo != "tienda"]
+        named = extract(body.texto).entidades
+        if named:  # a real entity that has not joined: say so, never "no es tu banco"
+            sites = official_websites().get(named[0], ())
+            return {"estado": "no_conectada", "entidad": named[0], "sitio": sites[0] if sites else None, "entidades": connected}
+        return {"estado": "entidad_desconocida", "entidades": connected}
     if not user.telefono_hash:
         return {"estado": "falta_telefono", "entidad": entidad.nombre}
     found = await llamadas.consult(db, user, entidad)

@@ -18,7 +18,12 @@ def entity_key(client):
 
 def test_health(client):
     body = client.get("/health").json()
-    assert body["base_de_datos"] == "ok" and body["ia"] == "no disponible"
+    assert body["base_de_datos"] == "ok" and body["ia"] == "no disponible" and isinstance(body["demo"], bool)
+
+
+def test_team_key_check(client):
+    assert client.get("/api/v1/equipo/yo", headers=ADMIN).json() == {"equipo": True}
+    assert client.get("/api/v1/equipo/yo", headers={"X-Admin-Key": "otra"}).status_code == 401
 
 
 def test_blank_and_long_text_are_rejected(client):
@@ -97,6 +102,8 @@ def test_llamada_verificada(client, entity_key):
     assert calls[0]["estado"] == "confirmada" and calls[0]["cliente"] == "+57 310 ••• 0000"
     unknown = client.post("/api/v1/bot/llamada", json=person | {"texto": "¿Me llama el banco XYZ?"}, headers=BOT).json()
     assert unknown["estado"] == "entidad_desconocida"
+    real_bank = client.post("/api/v1/bot/llamada", json=person | {"texto": "¿Bancolombia me está llamando?"}, headers=BOT).json()
+    assert real_bank["estado"] == "no_conectada" and real_bank["entidad"] == "Bancolombia" and real_bank["sitio"] == "bancolombia.com"
 
 
 def test_banco_counts_each_person_once(client):

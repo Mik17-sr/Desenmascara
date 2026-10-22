@@ -22,7 +22,9 @@ from telegram.ext import ContextTypes
 
 from app.bot import textos
 from app.bot.api import IMAGE_TIMEOUT, VOICE_TIMEOUT, Api, ApiError
-from app.bot.formatters import SEMAFORO, b, esc, format_analysis, format_call, format_code, format_heard, format_number, format_report, join
+from app.bot.formatters import (
+    SEMAFORO, b, esc, format_analysis, format_call, format_code, format_heard, format_not_connected, format_number, format_report, join,
+)
 from app.core.security import normalize_phone
 from app.engine.pistas import extract, plain
 from app.schemas.contract import AnalysisResult
@@ -396,7 +398,10 @@ async def _verified_call(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
     except ApiError as error:
         await _api_error(update, context, error)
         return
-    if info["estado"] == "entidad_desconocida":
+    if info["estado"] == "no_conectada":
+        context.user_data["modo"] = "numero"
+        await _reply(update, format_not_connected(info))
+    elif info["estado"] == "entidad_desconocida":
         context.user_data["modo"] = "numero"
         await _reply(update, join(
             esc("No encontré esa entidad en Llamada Verificada."),
