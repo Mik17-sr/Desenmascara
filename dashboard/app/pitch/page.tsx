@@ -22,7 +22,7 @@ const PILLARS = [
   { icon: Activity, title: "La solución", text: "Reenvías el mensaje o el número a @Desenmascara_bot y en segundos recibes un semáforo con el porqué. Cuando puede, confirma con la fuente: tu familiar o tu banco." },
   { icon: Building, title: "El modelo", text: "Las entidades pagan por Llamada Verificada y por las alertas tempranas de suplantación. Para las personas es gratis." },
 ];
-const TEAM = ["Luis Guillermo Nieto Patiño", "Miguel", "Gerhard Arce", "IngBocadillo"];
+const TEAM = ["Luis Nieto", "Miguel Sierra", "Gerhard Arce", "Tomas Lancheros"];
 
 const link = "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition active:scale-[0.98]";
 
