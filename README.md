@@ -36,6 +36,14 @@ Cuando la estafa se hace pasar por alguien real, Desenmascara no adivina: le pre
 
 ![Animación del Círculo de Confianza: el bot marca sospechoso el mensaje del falso familiar, le pregunta a tu familiar si fue él y, si dice que no, te avisa que es una estafa](docs/img/flujo-circulo.svg)
 
+### Antes del daño, la red y el seguimiento
+
+![Animación de Antes de pagar y de la app de Android: el bot revisa las señales de una compra y, cuando entra una llamada, la app consulta el Banco de números y avisa «No contestes»](docs/img/flujo-proteccion.svg)
+
+![Animación de la red: los reportes de la comunidad llenan el Banco de números, revelan una campaña y llegan al Radar, al panel de la entidad y al equipo](docs/img/flujo-red.svg)
+
+![Animación del seguimiento del caso y la privacidad: la línea de tiempo del caso DSM y el mensaje que pierde nombre, cuenta y número antes de guardarse](docs/img/flujo-caso.svg)
+
 Las animaciones se generan con `scripts/diagramas.py` (SVG con animación CSS, sin JavaScript). Con «reducir movimiento» activado en el sistema se ven quietas y completas.
 
 ---

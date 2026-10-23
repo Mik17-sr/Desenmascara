@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="960" height="520" role="img" aria-labelledby="titulo"><title id="titulo">Seguimiento del caso: cada verificación tiene una referencia y registra si se recibió, cómo se analizó, si es parte de una campaña, qué respondió el Círculo y qué se reportó. Antes de guardar se borran nombres, cuentas y números.</title><style>
+svg{--card:#f4f6f5;--box:#ffffff;--ink:#131a18;--muted:#5f6b68;--line:#d5dedb;--edge:#97a9a5;
+--brand:#0e9f8e;--brand-ink:#0b7f72;--brand-soft:#e3f5f2;--bubble:#eef3f1;
+--low:#1e8449;--mid:#b7860b;--high:#c0392b;--low-soft:#d6ede0;--mid-soft:#f6e9c2;--high-soft:#f7d9d5}
+@media (prefers-color-scheme:dark){svg{--card:#0b100f;--box:#131b1a;--ink:#e9efee;--muted:#94a3a0;--line:#26332f;
+--edge:#55706a;--brand:#2bb5a3;--brand-ink:#3cc9b6;--brand-soft:#12312c;--bubble:#1a2422;
+--low:#3fb071;--mid:#e0b33a;--high:#e5544a;--low-soft:#143222;--mid-soft:#322a14;--high-soft:#351a19}}
+text{font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;fill:var(--ink)}
+.h1{font-size:22px;font-weight:700}
+.sub{font-size:14px;fill:var(--muted)}
+.t{font-size:15px;font-weight:600}
+.tb{font-size:13.5px;font-weight:600}
+.s{font-size:12.5px;fill:var(--muted)}
+.m{font-size:12.5px}
+.xs{font-size:11px;fill:var(--muted)}
+.tag{font-size:10.5px;fill:var(--muted);letter-spacing:.03em}
+.mono{font-family:ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;font-weight:700}
+.b{font-weight:700}
+.card{fill:var(--card)}
+.box{fill:var(--box);stroke:var(--line);stroke-width:1.2}
+.act{fill:var(--brand-soft);stroke:var(--brand);stroke-width:2}
+.done{fill:none;stroke:var(--brand);stroke-width:1.5;stroke-opacity:.55}
+.frame{fill:none;stroke:var(--line);stroke-width:1.2;stroke-dasharray:4 4}
+.edge{fill:none;stroke:var(--edge);stroke-width:1.6}
+.reply{stroke-dasharray:6 4}
+.call{stroke-dasharray:2 4;stroke-width:2}
+.loop{fill:none;stroke:var(--brand);stroke-width:1.8;stroke-dasharray:6 5}
+.life{stroke:var(--line);stroke-width:1.4;stroke-dasharray:3 5}
+.badge{fill:var(--brand-soft)}
+.badge-n{font-size:12.5px;font-weight:700;fill:var(--brand-ink)}
+.chk{fill:var(--brand)}
+.chk-p{fill:none;stroke:var(--box);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pkt{fill:var(--brand)}
+.halo{fill:var(--brand);opacity:.22}
+.bubble{fill:var(--bubble)}
+.rail{fill:var(--line)}
+.rail-f{fill:var(--brand)}
+.low{fill:var(--low)}.mid{fill:var(--mid)}.high{fill:var(--high)}
+.low-s{fill:var(--low-soft)}.mid-s{fill:var(--mid-soft)}.high-s{fill:var(--high-soft)}
+.bar{fill:var(--edge);opacity:.55}
+.pill{fill:var(--brand)}
+.pill-t{font-size:11.5px;font-weight:700;fill:var(--box)}
+.chip{fill:var(--box);stroke:var(--line);stroke-width:1.2}
+.ring{fill:none;stroke:var(--high);stroke-width:2}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+@keyframes k1{0.000%{transform:scaleY(0);opacity:1}5.455%{transform:scaleY(0.0000);opacity:1}12.727%{transform:scaleY(0.2500);opacity:1}20.000%{transform:scaleY(0.5000);opacity:1}27.273%{transform:scaleY(0.7500);opacity:1}34.545%{transform:scaleY(1.0000);opacity:1}94.545%{transform:scaleY(1.0000);opacity:1}98.182%{transform:scaleY(1.0000);opacity:0}100.000%{transform:scaleY(0);opacity:0}}
+@keyframes k2{0.000%{opacity:0;transform:translateX(-6px)}5.455%{opacity:0;transform:translateX(-6px)}8.182%{opacity:1;transform:translateX(0)}94.545%{opacity:1;transform:translateX(0)}98.182%{opacity:0;transform:translateX(0)}100.000%{opacity:0;transform:translateX(-6px)}}
+@keyframes k3{0.000%{opacity:0;transform:translateX(-6px)}12.727%{opacity:0;transform:translateX(-6px)}15.455%{opacity:1;transform:translateX(0)}94.545%{opacity:1;transform:translateX(0)}98.182%{opacity:0;transform:translateX(0)}100.000%{opacity:0;transform:translateX(-6px)}}
+@keyframes k4{0.000%{opacity:0;transform:translateX(-6px)}20.000%{opacity:0;transform:translateX(-6px)}22.727%{opacity:1;transform:translateX(0)}94.545%{opacity:1;transform:translateX(0)}98.182%{opacity:0;transform:translateX(0)}100.000%{opacity:0;transform:translateX(-6px)}}
+@keyframes k5{0.000%{opacity:0;transform:translateX(-6px)}27.273%{opacity:0;transform:translateX(-6px)}30.000%{opacity:1;transform:translateX(0)}94.545%{opacity:1;transform:translateX(0)}98.182%{opacity:0;transform:translateX(0)}100.000%{opacity:0;transform:translateX(-6px)}}
+@keyframes k6{0.000%{opacity:0;transform:translateX(-6px)}34.545%{opacity:0;transform:translateX(-6px)}37.273%{opacity:1;transform:translateX(0)}94.545%{opacity:1;transform:translateX(0)}98.182%{opacity:0;transform:translateX(0)}100.000%{opacity:0;transform:translateX(-6px)}}
+@keyframes k7{0.000%{opacity:1}40.000%{opacity:1}42.727%{opacity:0}97.273%{opacity:0}100.000%{opacity:1}}
+@keyframes k8{0.000%{opacity:0;}42.727%{opacity:0;}45.455%{opacity:1;}94.545%{opacity:1;}98.182%{opacity:0;}100.000%{opacity:0;}}
+@keyframes k9{0.000%{opacity:0;transform:translateY(4px)}50.909%{opacity:0;transform:translateY(4px)}53.636%{opacity:1;transform:translateY(0)}94.545%{opacity:1;transform:translateY(0)}98.182%{opacity:0;transform:translateY(0)}100.000%{opacity:0;transform:translateY(4px)}}
+@keyframes k10{0.000%{opacity:0;transform:translateY(4px)}56.364%{opacity:0;transform:translateY(4px)}59.091%{opacity:1;transform:translateY(0)}94.545%{opacity:1;transform:translateY(0)}98.182%{opacity:0;transform:translateY(0)}100.000%{opacity:0;transform:translateY(4px)}}
+@keyframes k11{0.000%{opacity:0;transform:translateY(4px)}61.818%{opacity:0;transform:translateY(4px)}64.545%{opacity:1;transform:translateY(0)}94.545%{opacity:1;transform:translateY(0)}98.182%{opacity:0;transform:translateY(0)}100.000%{opacity:0;transform:translateY(4px)}}</style><defs><marker id="ar-low" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--low)"/></marker><marker id="ar-mid" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--mid)"/></marker><marker id="ar-high" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--high)"/></marker><marker id="ar-brand" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--brand)"/></marker><marker id="ar-edge" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--edge)"/></marker></defs><rect width="960" height="520" rx="18" class="card"/><text x="40" y="46" class="h1">Seguimiento del caso y privacidad</text><text x="40" y="70" class="sub">Cada verificación deja un registro con su referencia, sin guardar datos personales.</text><rect x="40" y="92" width="430" height="378" rx="14" class="frame"/><text x="60" y="120" class="t">Seguimiento del caso</text><rect x="302" y="104" width="150" height="24" rx="12" class="badge"/><text x="377" y="120.5" class="badge-n mono" text-anchor="middle">DSM-1A2B3C4D</text><rect x="77" y="156" width="6" height="272" rx="3" class="rail"/><rect x="77" y="156" width="6" height="272" rx="3" class="rail-f" style="transform-box:fill-box;transform-origin:center top;animation:k1 11.0s linear infinite"/><g style="animation:k2 11.0s linear infinite"><circle cx="80" cy="156" r="9" style="fill:var(--brand);stroke:var(--card);stroke-width:3"/><text x="104" y="161" class="tb">Recibido</text><text x="104" y="179" class="s">Mensaje por Telegram · 3:05 p. m.</text></g><g style="animation:k3 11.0s linear infinite"><circle cx="80" cy="224" r="9" style="fill:var(--high);stroke:var(--card);stroke-width:3"/><text x="104" y="229" class="tb">Analizado</text><text x="104" y="247" class="s">Alto riesgo · 92/100 · cobranza falsa</text></g><g style="animation:k4 11.0s linear infinite"><circle cx="80" cy="292" r="9" style="fill:var(--mid);stroke:var(--card);stroke-width:3"/><text x="104" y="297" class="tb">Parte de una campaña</text><text x="104" y="315" class="s">14 reportes del mismo engaño</text></g><g style="animation:k5 11.0s linear infinite"><circle cx="80" cy="360" r="9" style="fill:var(--low);stroke:var(--card);stroke-width:3"/><text x="104" y="365" class="tb">Círculo de Confianza</text><text x="104" y="383" class="s">Juan confirmó: «No fui yo»</text></g><g style="animation:k6 11.0s linear infinite"><circle cx="80" cy="428" r="9" style="fill:var(--brand);stroke:var(--card);stroke-width:3"/><text x="104" y="433" class="tb">Reportado</text><text x="104" y="451" class="s">La próxima persona recibe el aviso</text></g><rect x="490" y="92" width="430" height="378" rx="14" class="frame"/><text x="510" y="120" class="t">Lo que se guarda</text><rect x="510" y="136" width="390" height="96" rx="10" class="bubble"/><g style="animation:k7 11.0s linear infinite"><text x="528" y="160" class="tag">LO QUE TE LLEGÓ</text><text x="528" y="184" class="m">«Hola, soy Juan Pérez. Consigna hoy a la cuenta</text><text x="528" y="204" class="m">1234567890 o llama al 310 555 1234»</text></g><g style="animation:k8 11.0s linear infinite"><text x="528" y="160" class="tag" style="fill:var(--brand-ink);font-weight:700">LO QUE SE GUARDA</text><text x="528" y="184" class="m"><tspan class="m">«Hola, soy </tspan><tspan class="b" style="fill:var(--brand)">[nombre]</tspan><tspan class="m">. Consigna hoy a la cuenta</tspan></text><text x="528" y="204" class="m"><tspan class="b" style="fill:var(--brand)">[cuenta]</tspan><tspan class="m"> o llama al </tspan><tspan class="b" style="fill:var(--brand)">[número]</tspan><tspan class="m">»</tspan></text></g><g style="animation:k9 11.0s linear infinite"><rect x="510" y="248" width="390" height="56" rx="10" class="box"/><circle cx="536" cy="276" r="8" class="chk"/><path d="M532.4 276.2 L535 278.8 L539.8 273.4" class="chk-p"/><text x="556" y="272" class="tb">Huellas, no datos</text><text x="556" y="290" class="s">Teléfonos e ids de Telegram como HMAC-SHA256</text></g><g style="animation:k10 11.0s linear infinite"><rect x="510" y="314" width="390" height="56" rx="10" class="box"/><circle cx="536" cy="342" r="8" class="chk"/><path d="M532.4 342.2 L535 344.8 L539.8 339.4" class="chk-p"/><text x="556" y="338" class="tb">Cifrado y control de acceso</text><text x="556" y="356" class="s">Códigos con Fernet, llaves por rol, todo por HTTPS</text></g><g style="animation:k11 11.0s linear infinite"><rect x="510" y="380" width="390" height="56" rx="10" class="box"/><circle cx="536" cy="408" r="8" class="chk"/><path d="M532.4 408.2 L535 410.8 L539.8 405.4" class="chk-p"/><text x="556" y="404" class="tb">Tus datos, tu decisión</text><text x="556" y="422" class="s">RLS en Supabase · /borrar elimina todo (Ley 1581)</text></g><circle cx="49" cy="491" r="8" class="badge"/><text x="49" y="495" class="badge-n" text-anchor="middle">i</text><text x="64" y="495" class="s">La persona ve su caso con /caso en el bot; la referencia va en el kit de denuncia para la Policía.</text></svg>

@@ -405,10 +405,208 @@ def circulo() -> str:
     )
 
 
+# ---------------------------------------------------------------- 4 · before paying and before answering
+
+PHONE_BODY, PHONE_SCREEN, PHONE_MUTED = "#0b100f", "#1b2524", "#94a3a0"  # the phone stays dark in both themes
+
+
+def chips(x, y, labels, start, step, tone="high"):
+    """Small pills that appear one after another."""
+    out, cx = [], x
+    for i, label in enumerate(labels):
+        w = len(label) * 6.4 + 18
+        out.append((cx, w, label, start + i * step))
+        cx += w + 8
+    return [(f'<g style="{{style}}"><rect x="{cx:.1f}" y="{y}" width="{w:.1f}" height="22" rx="11" class="{tone}-s"/>'
+             + text(round(cx + w / 2, 1), y + 15, label, "xs b", "middle", style=f"fill:{TONE[tone]}") + "</g>", t)
+            for cx, w, label, t in out]
+
+
+def step_box(o, a, x, y, w, h, n, title, active, done):
+    o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" class="box"/>')
+    o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" class="act" style="{a.pulses(active)}"/>')
+    o.append(f'<g style="{a.reveal(done, 0.3)}"><rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" class="done"/>'
+             f'{check(x + w - 20, y + 20)}</g>')
+    if n:
+        o.append(f'<circle cx="{x + 24}" cy="{y + 26}" r="12" class="badge"/>')
+        o.append(text(x + 24, y + 30.5, n, "badge-n", "middle"))
+    o.append(text(x + (44 if n else 18), y + 31, title, "tb"))
+
+
+def proteccion() -> str:
+    a = Anim(12.0, 11.4)
+    W, H = 960, 520
+    o = [text(40, 46, "Antes de pagar y antes de contestar", "h1"),
+         text(40, 70, "Revisa una compra antes de transferir, y avisa en el celular si la llamada viene de un número reportado.", "sub")]
+
+    # Left · a purchase
+    o.append('<rect x="40" y="92" width="430" height="378" rx="14" class="frame"/>')
+    o.append(text(60, 120, "Antes de pagar", "t"))
+    step_box(o, a, 60, 136, 390, 72, "1", "Envías la oferta", [(0.5, 1.5)], 1.5)
+    o.append(text(80, 192, "La captura, el número del vendedor y la llave de pago"))
+    step_box(o, a, 60, 220, 390, 72, "2", "Revisa las señales", [(1.7, 3.6)], 3.6)
+    for chip, t in chips(80, 258, ["Precio irreal", "Anticipo", "Pasar a otra app"], 2.1, 0.5):
+        o.append(chip.replace("{style}", a.reveal(t, 0.25, "transform:translateY(3px)", "transform:translateY(0)")))
+    step_box(o, a, 60, 304, 390, 72, "3", "Te dice cómo pagar seguro", [(3.8, 4.6)], 4.6)
+    o.append(text(80, 360, "Contraentrega o una plataforma con protección al comprador"))
+    o.append(f'<g style="{a.reveal(4.8, 0.3, "transform:translateY(4px)", "transform:translateY(0)")}">'
+             '<rect x="60" y="390" width="390" height="62" rx="10" class="mid-s"/>'
+             + spans(78, 415, [("SOSPECHOSO", "b", "mid"), (" · pide un anticipo a un desconocido", "m", None)])
+             + text(78, 436, "No pagues hasta tener el producto en la mano.", "m") + "</g>")
+
+    # Right · a call on Android
+    o.append('<rect x="490" y="92" width="430" height="378" rx="14" class="frame"/>')
+    o.append(text(510, 120, "App de Android", "t"))
+    px, py, pw, ph = 520, 138, 150, 296
+    cx = px + pw / 2
+    o.append(f'<rect x="{px}" y="{py}" width="{pw}" height="{ph}" rx="22" style="fill:{PHONE_BODY}"/>')
+    o.append(f'<rect x="{px + 8}" y="{py + 8}" width="{pw - 16}" height="{ph - 16}" rx="16" style="fill:{PHONE_SCREEN}"/>')
+    for k, t in enumerate([5.0, 5.6, 6.2, 6.8]):  # it rings
+        o.append(f'<circle cx="{cx}" cy="{py + 96}" r="24" style="fill:none;stroke:var(--brand);stroke-width:2;transform-box:fill-box;'
+                 f'transform-origin:center;' + a.kf([(0, "opacity:0;transform:scale(1)"), (t, "opacity:0;transform:scale(1)"),
+                                                    (t + 0.05, "opacity:.9;transform:scale(1)"), (t + 0.8, "opacity:0;transform:scale(2.1)"),
+                                                    (a.T, "opacity:0;transform:scale(1)")]) + '"/>')
+    o.append(f'<circle cx="{cx}" cy="{py + 96}" r="24" style="fill:#2a3634"/>')
+    o.append(text(cx, py + 102, "?", "t", "middle", style="fill:#ffffff"))
+    o.append(text(cx, py + 150, "+57 3•• ••• ••••", "tb", "middle", style="fill:#ffffff"))
+    o.append(text(cx, py + 170, "Llamada entrante", "xs", "middle", style=f"fill:{PHONE_MUTED}"))
+    o.append(f'<circle cx="{px + 42}" cy="{py + 252}" r="16" style="fill:#c0392b"/>')
+    o.append(f'<circle cx="{px + pw - 42}" cy="{py + 252}" r="16" style="fill:#1e8449"/>')
+    o.append(f'<circle cx="{px + 42}" cy="{py + 252}" r="16" class="ring" style="transform-box:fill-box;transform-origin:center;'
+             + a.kf([(0, "opacity:0;transform:scale(1)"), (8.0, "opacity:0;transform:scale(1)"), (8.05, "opacity:1;transform:scale(1)"),
+                     (8.8, "opacity:0;transform:scale(1.9)"), (a.T, "opacity:0;transform:scale(1)")]) + '"/>')
+    banner = (f'<rect x="{px + 14}" y="{py + 16}" width="{pw - 28}" height="56" rx="10" class="high"/>'
+              + text(cx, py + 40, "NO CONTESTES", "tb", "middle", style="fill:#ffffff")
+              + text(cx, py + 58, "número reportado", "xs", "middle", style="fill:#ffe4e1"))
+    o.append(f'<g style="{a.reveal(7.0, 0.3, "transform:translateY(-6px)", "transform:translateY(0)")}">{banner}</g>')
+    o.append(f'<g style="{a.reveal(8.6, 0.3)}">' + text(cx, py + ph + 24, "Rosa no contesta", "m b", "middle", style="fill:var(--low)") + "</g>")
+
+    bx, by, bw, bh = 712, 196, 188, 76
+    step_box(o, a, bx, by, bw, bh, None, "Banco de números", [(5.8, 6.6)], 6.6)
+    o.append(text(bx + 18, by + 54, "3 reportes · falso asesor"))
+    o.append(f'<path d="M{px + pw + 4} {by + 30} H{bx - 6}" class="edge" marker-end="url(#ar-edge)"/>')
+    o.append(f'<path d="M{bx - 4} {by + 50} H{px + pw + 8}" class="edge reply" marker-end="url(#ar-edge)"/>')
+    dot = '<circle r="10" class="halo"/><circle r="5" class="pkt"/>'
+    o.append(f'<g style="{a.packet([([(px + pw, by + 30), (bx, by + 30)], 5.3, 5.8), ([(bx, by + 50), (px + pw, by + 50)], 6.5, 7.0)])}">{dot}</g>')
+    for i, line in enumerate(["Mientras suena, la app consulta", "el Banco de números y avisa", "antes de contestar."]):
+        o.append(text(bx, 306 + i * 18, line))
+    o.append(f'<circle cx="49" cy="{H - 29}" r="8" class="badge"/>' + text(49, H - 25, "i", "badge-n", "middle"))
+    o.append(text(64, H - 25, "Si la entidad registró la llamada, la app dice «Contesta y pide el código».", "s"))
+    label = ("Antes de pagar: envías la oferta, el bot revisa señales como el precio irreal o el anticipo y te dice cómo pagar seguro. "
+             "En Android, cuando entra una llamada, la app consulta el Banco de números y avisa «No contestes» si el número fue reportado.")
+    return svg(W, H, a, label, "".join(o))
+
+
+# ---------------------------------------------------------------- 5 · every report protects someone else
+
+def red() -> str:
+    a = Anim(11.0, 10.4)
+    W, H = 960, 520
+    o = [text(40, 46, "Cada reporte protege a otros", "h1"),
+         text(40, 70, "Los reportes forman el Banco de números y revelan las campañas; el Radar, las entidades y el equipo actúan.", "sub")]
+    dot = '<circle r="10" class="halo"/><circle r="5" class="pkt"/>'
+    o.append(text(60, 112, "REPORTES DE LA COMUNIDAD", "tag"))
+    people = [("R", 150, "un número", (330, 196)), ("J", 225, "una llave Bre-B", (330, 206)),
+              ("M", 300, "un enlace", (330, 216)), ("L", 375, "el mismo mensaje", (330, 356))]
+    for i, (ini, y, what, (tx, ty)) in enumerate(people):
+        t0 = 0.6 + i * 0.6
+        o.append(f'<path d="M114 {y} L{tx - 6} {ty}" class="edge" marker-end="url(#ar-edge)" style="{a.reveal(t0 - 0.3, 0.2)}"/>')
+        o.append(f'<g style="{a.reveal(t0 - 0.4, 0.25)}"><circle cx="90" cy="{y}" r="22" class="box"/>'
+                 + text(90, y + 5, ini, "tb", "middle") + text(90, y + 38, what, "xs", "middle") + "</g>")
+        o.append(f'<g style="{a.packet([([(112, y), (tx, ty)], t0, t0 + 0.55)])}">{dot}</g>')
+
+    # Centre · the Banco and the campaigns
+    step_box(o, a, 330, 140, 240, 120, None, "Banco de números", [(0.9, 3.3)], 3.3)
+    o.append(text(348, 192, "+57 3•• ••• 4521", "m mono"))
+    for k, (on, off) in enumerate([(1.15, 1.75), (1.75, 2.35), (2.35, 2.95), (2.95, a.hold)]):
+        o.append(f'<g style="{a.pulses([(on, off)], 0.1, 0.1)}">'
+                 + spans(348, 218, [(str(k + 1), "t", "high"), (" persona" if k == 0 else " personas", "s", None),
+                                    (" lo reportaron", "s", None)]) + "</g>")
+    o.append('<rect x="348" y="232" width="204" height="6" rx="3" class="rail"/>')
+    o.append('<rect x="348" y="232" width="204" height="6" rx="3" class="high" style="transform-box:fill-box;transform-origin:left center;'
+             + a.grow([(1.15, 0), (1.75, 0.3), (2.35, 0.55), (2.95, 0.85)]) + '"/>')
+    step_box(o, a, 330, 300, 240, 120, None, "Campañas", [(2.9, 4.6)], 4.6)
+    o.append(text(348, 352, "El mismo engaño, aunque cambie el texto"))
+    for chip, t in chips(348, 364, ["92 %", "88 %", "95 %"], 3.2, 0.3, tone="mid"):
+        o.append(chip.replace("{style}", a.reveal(t, 0.2)))
+    o.append(f'<g style="{a.reveal(4.2, 0.3)}"><rect x="348" y="394" width="150" height="20" rx="10" class="high"/>'
+             + text(423, 408, "CAMPAÑA DETECTADA", "pill-t", "middle") + "</g>")
+
+    # Right · who acts on it
+    outs = [(130, "Dashboard y Radar", "Actividad, campañas e impacto, en vivo"),
+            (222, "Panel de la entidad", "Alerta temprana: están usando su nombre"),
+            (314, "Equipo Desenmascara", "Vuelve la campaña una regla del bot")]
+    starts = [(570, 200), (570, 280), (570, 360)]
+    for i, ((y, title, sub), (sx, sy)) in enumerate(zip(outs, starts)):
+        t0 = 5.0 + i * 0.6
+        step_box(o, a, 650, y, 270, 76, None, title, [(t0 + 0.4, t0 + 1.0)], t0 + 1.0)
+        o.append(text(668, y + 54, sub))
+        o.append(f'<path d="M{sx + 4} {sy} L646 {y + 38}" class="edge" marker-end="url(#ar-edge)"/>')
+        o.append(f'<g style="{a.packet([([(sx, sy), (650, y + 38)], t0, t0 + 0.45)])}">{dot}</g>')
+    o.append(f'<g style="{a.reveal(7.2, 0.3, "transform:translateY(4px)", "transform:translateY(0)")}">'
+             '<rect x="650" y="406" width="270" height="48" rx="8" class="low-s"/>'
+             + text(785, 426, "La próxima persona que consulte", "m b", "middle", style="fill:var(--low)")
+             + text(785, 444, "ese número recibe el aviso", "m b", "middle", style="fill:var(--low)") + "</g>")
+    o.append(f'<circle cx="49" cy="{H - 29}" r="8" class="badge"/>' + text(49, H - 25, "i", "badge-n", "middle"))
+    o.append(text(64, H - 25, "Cada persona cuenta una sola vez por número: nadie puede hundir un número por su cuenta.", "s"))
+    label = ("La comunidad reporta números, llaves y enlaces; así crece el Banco de números con el nivel de riesgo de cada uno, y los "
+             "mensajes parecidos forman una campaña. El Radar, el panel de la entidad y el equipo actúan sobre eso.")
+    return svg(W, H, a, label, "".join(o))
+
+
+# ---------------------------------------------------------------- 6 · the case trace and privacy
+
+def caso() -> str:
+    a = Anim(11.0, 10.4)
+    W, H = 960, 520
+    o = [text(40, 46, "Seguimiento del caso y privacidad", "h1"),
+         text(40, 70, "Cada verificación deja un registro con su referencia, sin guardar datos personales.", "sub")]
+    o.append('<rect x="40" y="92" width="430" height="378" rx="14" class="frame"/>')
+    o.append(text(60, 120, "Seguimiento del caso", "t"))
+    o.append('<rect x="302" y="104" width="150" height="24" rx="12" class="badge"/>')
+    o.append(text(377, 120.5, "DSM-1A2B3C4D", "badge-n mono", "middle"))
+    steps = [("Recibido", "Mensaje por Telegram · 3:05 p. m.", "brand"), ("Analizado", "Alto riesgo · 92/100 · cobranza falsa", "high"),
+             ("Parte de una campaña", "14 reportes del mismo engaño", "mid"), ("Círculo de Confianza", "Juan confirmó: «No fui yo»", "low"),
+             ("Reportado", "La próxima persona recibe el aviso", "brand")]
+    o.append('<rect x="77" y="156" width="6" height="272" rx="3" class="rail"/>')
+    o.append('<rect x="77" y="156" width="6" height="272" rx="3" class="rail-f" style="transform-box:fill-box;transform-origin:center top;'
+             + a.grow([(0.6, 0), (1.4, 0.25), (2.2, 0.5), (3.0, 0.75), (3.8, 1)], "Y") + '"/>')
+    for i, (title, sub, tone) in enumerate(steps):
+        y, t = 156 + i * 68, 0.6 + i * 0.8
+        o.append(f'<g style="{a.reveal(t, 0.3, "transform:translateX(-6px)", "transform:translateX(0)")}">'
+                 f'<circle cx="80" cy="{y}" r="9" style="fill:{TONE[tone]};stroke:var(--card);stroke-width:3"/>'
+                 + text(104, y + 5, title, "tb") + text(104, y + 23, sub) + "</g>")
+
+    o.append('<rect x="490" y="92" width="430" height="378" rx="14" class="frame"/>')
+    o.append(text(510, 120, "Lo que se guarda", "t"))
+    o.append('<rect x="510" y="136" width="390" height="96" rx="10" class="bubble"/>')
+    before = a.kf([(0, "opacity:1"), (4.4, "opacity:1"), (4.7, "opacity:0"), (a.T - 0.3, "opacity:0"), (a.T, "opacity:1")])
+    o.append(f'<g style="{before}">' + text(528, 160, "LO QUE TE LLEGÓ", "tag")
+             + text(528, 184, "«Hola, soy Juan Pérez. Consigna hoy a la cuenta", "m")
+             + text(528, 204, "1234567890 o llama al 310 555 1234»", "m") + "</g>")
+    o.append(f'<g style="{a.reveal(4.7, 0.3)}">' + text(528, 160, "LO QUE SE GUARDA", "tag", style="fill:var(--brand-ink);font-weight:700")
+             + spans(528, 184, [("«Hola, soy ", "m", None), ("[nombre]", "b", "brand"), (". Consigna hoy a la cuenta", "m", None)])
+             + spans(528, 204, [("[cuenta]", "b", "brand"), (" o llama al ", "m", None), ("[número]", "b", "brand"), ("»", "m", None)]) + "</g>")
+    layers = [("Huellas, no datos", "Teléfonos e ids de Telegram como HMAC-SHA256"),
+              ("Cifrado y control de acceso", "Códigos con Fernet, llaves por rol, todo por HTTPS"),
+              ("Tus datos, tu decisión", "RLS en Supabase · /borrar elimina todo (Ley 1581)")]
+    for i, (title, sub) in enumerate(layers):
+        y, t = 248 + i * 66, 5.6 + i * 0.6
+        o.append(f'<g style="{a.reveal(t, 0.3, "transform:translateY(4px)", "transform:translateY(0)")}">'
+                 f'<rect x="510" y="{y}" width="390" height="56" rx="10" class="box"/>{check(536, y + 28)}'
+                 + text(556, y + 24, title, "tb") + text(556, y + 42, sub) + "</g>")
+    o.append(f'<circle cx="49" cy="{H - 29}" r="8" class="badge"/>' + text(49, H - 25, "i", "badge-n", "middle"))
+    o.append(text(64, H - 25, "La persona ve su caso con /caso en el bot; la referencia va en el kit de denuncia para la Policía.", "s"))
+    label = ("Seguimiento del caso: cada verificación tiene una referencia y registra si se recibió, cómo se analizó, si es parte de una "
+             "campaña, qué respondió el Círculo y qué se reportó. Antes de guardar se borran nombres, cuentas y números.")
+    return svg(W, H, a, label, "".join(o))
+
+
 if __name__ == "__main__":
     out = Path(__file__).resolve().parent.parent / "docs" / "img"
     out.mkdir(parents=True, exist_ok=True)
     for name, build in [("flujo-mensaje.svg", main_flow), ("flujo-llamada-verificada.svg", llamada),
-                        ("flujo-circulo.svg", circulo)]:
+                        ("flujo-circulo.svg", circulo), ("flujo-proteccion.svg", proteccion), ("flujo-red.svg", red),
+                        ("flujo-caso.svg", caso)]:
         (out / name).write_text(build(), encoding="utf-8")
         print(out / name)
