@@ -5,7 +5,7 @@
 **Evento:** Colombia 5.0 Hackathon (22 al 23 de octubre de 2026)  
 **Versión:** 7.0 · Edición Telegram Nativo  
 **Canal Ciudadano:** Telegram Bot API ([@Desenmascara_bot](https://t.me/Desenmascara_bot))  
-**Equipo:** Luis Guillermo Nieto Patiño · Miguel · Gerhard Arce · IngBocadillo  
+**Equipo:** Luis Guillermo Nieto Patiño · Miguel Sierra · Gerhard Arce · Tomas Lancheros  
 **Lema:** *Reenvía el mensaje. Desenmascara la estafa. Las demás herramientas adivinan; Desenmascara confirma con la fuente.*  
 **Pitch en video (3 min):** [desenmascara.onrender.com/pitch](https://desenmascara.onrender.com/pitch/)
 
